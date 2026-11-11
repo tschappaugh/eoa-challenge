@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Blocks commits that stage .env or any file containing an API key.
+# Prints file names only, never the matched value.
+root="$(git rev-parse --show-toplevel)"
+redact="$root/scripts/redact.sh"
+fail=0
+
+while IFS= read -r f; do
+  case "$f" in
+    .env|.env.*|*/.env|*/.env.*)
+      [ "$(basename "$f")" = ".env.example" ] && continue
+      echo "pre-commit: refusing to commit $f" >&2
+      fail=1
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+while IFS= read -r f; do
+  added=$(git diff --cached -U0 -- "$f" | grep -a '^+' | grep -av '^+++' || true)
+  [ -n "$added" ] || continue
+  if ! printf '%s\n' "$added" | "$redact" | cmp -s - <(printf '%s\n' "$added"); then
+    echo "pre-commit: possible API key in $f" >&2
+    fail=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: commit blocked. Remove the secret and re-stage." >&2
+  exit 1
+fi
+exit 0

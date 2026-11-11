@@ -6,15 +6,17 @@ office library. The full plan and all product decisions are in
 
 ## Current status
 
-- **Done:** AI session logging (`.claude/settings.json` hooks →
-  `.claude/hooks/log-ai.sh` → `ai-logs/session-<date>-<id>.md`), verified
-  firing. `.gitignore` ignores `ai-logs/*.jsonl`. Plan finalized in
-  `PLAN.md`.
-- **Not done:** not yet a git repo; remote
-  `https://github.com/tschappaugh/eoa-challenge.git` not connected. No app
-  code yet. No API key generated yet.
-- **Next:** Phase 1 (repo setup and secret safeguards), then Phase 2 (API
-  probing). See PLAN.md → Phases.
+- **Done (Phase 1):** git repo with remote
+  `https://github.com/tschappaugh/eoa-challenge.git`; AI session logging
+  (`.claude/hooks/log-ai.sh` -> `ai-logs/session-<date>-<id>.md`) with API
+  key redaction via `scripts/redact.sh`; pre-commit secret check
+  (`scripts/git-hooks/pre-commit`, enabled with `scripts/setup-hooks.sh`);
+  `scripts/scrub-transcript.sh` for the final `/export`; `.gitignore` and
+  `.env.example`. Tests: `scripts/test-redact.sh`.
+- **Not done:** no app code yet; no API key generated; nothing pushed since
+  the initial commit.
+- **Next:** Phase 2 (API probing), then Phase 3 (backend). See PLAN.md ->
+  Phases.
 
 ## Hard constraints
 

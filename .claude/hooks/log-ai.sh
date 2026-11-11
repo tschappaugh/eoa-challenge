@@ -8,6 +8,11 @@ command -v jq >/dev/null || exit 0
 input=$(cat)
 [ -n "$input" ] || exit 0
 
+# Redact API keys before anything is parsed or written
+redact="$(cd "$(dirname "$0")/../.." && pwd)/scripts/redact.sh"
+[ -x "$redact" ] || exit 0
+input=$(printf '%s' "$input" | "$redact") || exit 0
+
 root="${CLAUDE_PROJECT_DIR:-$(printf '%s' "$input" | jq -r '.cwd // empty')}"
 [ -n "$root" ] || root="$PWD"
 dir="$root/ai-logs"
@@ -67,7 +72,7 @@ case "$event" in
     fi
     {
       printf '## [%s] Claude\n\n' "$ts"
-      printf '%s' "$reply" | head -c 8000
+      printf '%s' "$reply" | "$redact" | head -c 8000
       printf '\n\n---\n\n'
     } >> "$md"
     ;;
