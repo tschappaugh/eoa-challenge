@@ -168,6 +168,31 @@ Focused on the logic that matters, not coverage numbers:
 - **Frontend:** errors are surfaced, disabled state when the limit is used,
   optimistic update rollback.
 
+## Observed API behavior (Phase 2)
+
+Probed with `scripts/probe-api.sh` (re-runnable; reads the key from `.env`).
+All write endpoints take **form-encoded** bodies; JSON bodies fail.
+
+| Behavior | Observed | Consequence for our backend |
+| --- | --- | --- |
+| Duplicate titles | Accepted; each gets a new id (`Zelda`, `zelda`, `  Zelda  ` all added) | Our unique `title_normalized` index is the only guard — confirmed essential |
+| Empty or missing `name` | `200 {"id":-1}` | Validate before calling; treat any `id < 1` as failure |
+| Name storage | Not trimmed; no length limit seen (300 chars OK); HTML-escaped on store (`&` → `&amp;`, `<` → `&lt;`, `"` → `&quot;`) | Send the trimmed/collapsed title, cap length ourselves, `html_entity_decode` API names on read (prefer our local title for known games). React escapes on render, so never pre-escape |
+| `/games/list` order | Id order, **not** sorted by votes | Sort ourselves: votes desc, ties by id asc |
+| Vote | Anonymous counter; the same id can be voted repeatedly (count increments each time) | Per-user dedupe lives in our `votes` table |
+| `removeVote` | Decrements, floors at 0, returns `success: true` even when count is already 0 | Success doesn't prove a vote existed — our ledger decides whether a call is allowed |
+| Unknown or removed id | `search` → `200 {}`; `vote`/`removeVote`/`remove` → `200 {"success":false}` | Check the `success` flag and the empty-object case; HTTP 200 doesn't mean OK |
+| Removing twice | Second call → `{"success":false}` | Treat as already gone |
+| Ids | Sequential, never reused after a remove; `lastGameId` unchanged by a remove; both reset after `/cache/flush` | Don't assume ids are contiguous; never expose `flush` |
+| Id parsing | Loose: `id=2abc` acts as 2, `id=1.5` as 1 | Validate integer ids ourselves before forwarding |
+| Auth errors | `400 {"error":"MISSING_KEY"}`, `403 {"error":"INVALID_KEY"}` | Map to `UPSTREAM_UNAVAILABLE` for users; log the cause |
+| Wrong method / unknown route | HTML error page (405/404) | Client must handle non-JSON responses |
+| Isolation | Each key has its own library | Test data was flushed after probing; library is empty |
+
+Compensation notes: undoing an add is `/games/remove`; undoing a vote is
+`/games/removeVote`. Both are safe to call after a local failure because the
+counters are anonymous and floor at 0.
+
 ## Secret handling
 
 The EOA API key must never be committed — not in code, config, or AI logs.
@@ -196,7 +221,7 @@ The EOA API key must never be committed — not in code, config, or AI logs.
    `vendor/`, `node_modules/`, build output) and `.env.example`; log
    redaction plus tests; pre-commit secret check; transcript scrub script;
    connect the remote; initial commit. No push without approval.
-2. **API probing:** generate a key into `.env` and record actual behavior —
+2. **API probing (done):** generate a key into `.env` and record actual behavior —
    duplicate handling, negative vote counts, unknown IDs, status codes, body
    format. Findings go in the README.
 3. **Backend:** schema, API client, services, routes, PHPUnit tests.

@@ -13,10 +13,13 @@ office library. The full plan and all product decisions are in
   (`scripts/git-hooks/pre-commit`, enabled with `scripts/setup-hooks.sh`);
   `scripts/scrub-transcript.sh` for the final `/export`; `.gitignore` and
   `.env.example`. Tests: `scripts/test-redact.sh`.
-- **Not done:** no app code yet; no API key generated; nothing pushed since
-  the initial commit.
-- **Next:** Phase 2 (API probing), then Phase 3 (backend). See PLAN.md ->
-  Phases.
+- **Done (Phase 2):** API key generated into `.env` (gitignored, never
+  printed); API probed with `scripts/probe-api.sh`; findings recorded in
+  PLAN.md -> "Observed API behavior". The API is permissive (no dedupe, loose
+  ids, HTTP 200 for failures, HTML-escaped names), so our backend validates
+  everything and checks `success` flags.
+- **Not done:** no app code yet; nothing pushed since the initial commit.
+- **Next:** Phase 3 (scaffolding, then backend). See PLAN.md -> Phases.
 
 ## Hard constraints
 
