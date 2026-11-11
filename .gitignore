@@ -1,0 +1,2 @@
+# Raw AI hook payloads (keep only the markdown logs tracked)
+ai-logs/*.jsonl
