@@ -1,0 +1,43 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - '8080:80'
+    depends_on:
+      - php
+
+  php:
+    build:
+      context: ./backend
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-gamevoting}
+      DB_USER: ${DB_USER:-gamevoting}
+      DB_PASSWORD: ${DB_PASSWORD:-gamevoting}
+      EOA_API_BASE_URL: ${EOA_API_BASE_URL:-https://codechallenge.essensedesigns.info}
+      EOA_API_KEY: ${EOA_API_KEY:?Set EOA_API_KEY in .env (see .env.example)}
+      APP_DEBUG: ${APP_DEBUG:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-gamevoting}
+      MYSQL_USER: ${DB_USER:-gamevoting}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-gamevoting}
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db-data:

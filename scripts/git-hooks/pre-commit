@@ -15,10 +15,27 @@ while IFS= read -r f; do
   esac
 done < <(git diff --cached --name-only --diff-filter=ACM)
 
+# Lockfiles legitimately contain 32-char hashes (e.g. composer content-hash),
+# so they only get the exact-key check.
+key="${EOA_API_KEY:-}"
+if [ -z "$key" ] && [ -f "$root/.env" ]; then
+  key=$(grep -E '^EOA_API_KEY=' "$root/.env" | head -n 1 | cut -d= -f2-)
+fi
+
 while IFS= read -r f; do
   added=$(git diff --cached -U0 -- "$f" | grep -a '^+' | grep -av '^+++' || true)
   [ -n "$added" ] || continue
-  if ! printf '%s\n' "$added" | "$redact" | cmp -s - <(printf '%s\n' "$added"); then
+  case "$(basename "$f")" in
+    composer.lock|package-lock.json|yarn.lock|pnpm-lock.yaml)
+      if [ -n "$key" ] && printf '%s\n' "$added" | grep -qF -- "$key"; then
+        echo "pre-commit: API key in $f" >&2
+        fail=1
+      fi
+      continue
+      ;;
+  esac
+  redacted=$(printf '%s\n' "$added" | "$redact")
+  if [ "$redacted" != "$added" ]; then
     echo "pre-commit: possible API key in $f" >&2
     fail=1
   fi

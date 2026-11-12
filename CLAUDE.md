@@ -18,8 +18,28 @@ office library. The full plan and all product decisions are in
   PLAN.md -> "Observed API behavior". The API is permissive (no dedupe, loose
   ids, HTTP 200 for failures, HTML-escaped names), so our backend validates
   everything and checks `success` flags.
-- **Not done:** no app code yet; nothing pushed since the initial commit.
-- **Next:** Phase 3 (scaffolding, then backend). See PLAN.md -> Phases.
+- **Done (Phase 3 scaffold, branch `chore/scaffold`):** Docker Compose
+  stack (`web` nginx + built SPA, `php` php-fpm, `db` MySQL 8.4) verified:
+  `/api/health`, SPA deep links, schema created from
+  `backend/migrations/001_init.sql`, PHPUnit (3 tests) and Vitest (1 test)
+  passing. Backend skeleton in `backend/src` (Config, Database, Json,
+  AppFactory with JSON error handler); frontend is Vite + React + TS +
+  Tailwind v4 with a placeholder App.
+- **Not done:** all feature code (API client, services, routes, UI).
+- **Next:** merge `chore/scaffold`, then `feat/backend`. See PLAN.md ->
+  Phases.
+
+## Commands
+
+```bash
+docker-compose up -d --build        # app at http://localhost:8080
+docker-compose exec php vendor/bin/phpunit   # backend tests
+cd frontend && npm test             # frontend tests
+cd frontend && npm run dev          # Vite dev server (proxies /api to :8080)
+```
+
+Migrations only run when the `db-data` volume is first created; after
+changing `backend/migrations`, run `docker-compose down -v` to reapply.
 
 ## Hard constraints
 
