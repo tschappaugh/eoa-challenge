@@ -23,6 +23,13 @@ describe('validateTitle', () => {
     expect(validateTitle('Pokémon', ['Pokémon'])).toMatch(/already/)
     expect(validateTitle('Zelda 2', ['Zelda'])).toBeNull()
   })
+
+  it('treats curly quotes and dash variants as duplicates', () => {
+    expect(validateTitle("Baldur's Gate", ['Baldur’s Gate'])).toMatch(/already/)
+    expect(validateTitle('“Tag”', ['"Tag"'])).toMatch(/already/)
+    expect(validateTitle('Half–Life', ['Half-Life'])).toMatch(/already/)
+    expect(validateTitle('Baldurs Gate', ["Baldur's Gate"])).toBeNull()
+  })
 })
 
 describe('cleanTitle', () => {
@@ -33,5 +40,21 @@ describe('cleanTitle', () => {
 
   it('normalizes full-width letters when comparing', () => {
     expect(normalizeTitle('Ｚｅｌｄａ')).toBe('zelda')
+  })
+
+  it('folds every look-alike quote and dash the backend folds', () => {
+    for (const quote of ['’', '‘', '‛', 'ʼ', '′', '`', '´']) {
+      expect(normalizeTitle(`Baldur${quote}s`)).toBe("baldur's")
+    }
+    for (const quote of ['“', '”', '„', '‟', '″']) {
+      expect(normalizeTitle(`${quote}Tag${quote}`)).toBe('"tag"')
+    }
+    for (const dash of ['‐', '‑', '‒', '–', '—', '―', '−']) {
+      expect(normalizeTitle(`Half${dash}Life`)).toBe('half-life')
+    }
+  })
+
+  it('keeps the typed punctuation in the cleaned title', () => {
+    expect(cleanTitle('Baldur’s Gate')).toBe('Baldur’s Gate')
   })
 })

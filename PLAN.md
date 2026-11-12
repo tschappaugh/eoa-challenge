@@ -102,7 +102,23 @@ never sent to the browser. See [Secret handling](#secret-handling).
 
 ## Duplicate titles
 
-- Normalization: trim, collapse inner whitespace, lowercase.
+- Stored and shown title: NFC form, invisible format characters removed,
+  control characters turned to spaces, whitespace trimmed and collapsed.
+  The first person's punctuation is kept as typed.
+- Comparison key (`Title::normalize`, mirrored in the frontend's
+  `normalizeTitle`): the cleaned title with look-alike punctuation folded to
+  one ASCII form, then NFKC, then case-folded. The folding is a short,
+  explicit list, applied first because NFKC would rewrite some of these
+  characters itself:
+  - `’ ‘ ‛ ʼ ′` `` ` `` `´` → `'`
+  - `“ ” „ ‟ ″` → `"`
+  - `‐ ‑ ‒ – — ― −` → `-`
+
+  So `Baldur’s Gate`, `Baldur's Gate`, and `baldur´s gate` are the same game,
+  and `Half–Life` matches `Half-Life`. Punctuation is otherwise significant:
+  `Baldurs Gate` and `Half Life` are different titles. A full Unicode
+  confusables check (ICU `Spoofchecker`) was rejected as too aggressive for
+  game titles.
 - A unique index on `title_normalized`. The backend reserves the row, calls
   `/games/add`, then stores the returned `api_id`. If the API call fails, the
   reservation is deleted. This closes the race where two users add the same

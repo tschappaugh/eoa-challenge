@@ -98,6 +98,11 @@ changing `backend/migrations`, run `docker-compose down -v` to reapply.
 - One vote or one add per user per local day, enforced by a unique
   `(user_id, local_date)` index. Undoing today's vote or add refunds it.
 - Only a game's creator can remove it.
+- Duplicate titles are compared on a folded key: NFKC, case-folded, with
+  look-alike quotes and dashes (`’`/`´`/`` ` `` → `'`, `–`/`—` → `-`, etc.)
+  mapped to ASCII. The map lives in `Title::LOOKALIKES` (PHP) and `LOOKALIKES`
+  in `frontend/src/lib/title.ts`; change both together. Stored titles keep the
+  typed punctuation.
 
 ## Code standards
 

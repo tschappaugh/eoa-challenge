@@ -42,6 +42,27 @@ final class TitleTest extends TestCase
     public function testNormalizeKeepsDifferentTitlesDistinct(): void
     {
         $this->assertNotSame(Title::normalize('Zelda'), Title::normalize('Zelda 2'));
+        // Folding only merges look-alikes; the punctuation itself still counts.
+        $this->assertNotSame(Title::normalize("Baldur's Gate"), Title::normalize('Baldurs Gate'));
+        $this->assertNotSame(Title::normalize('Half-Life'), Title::normalize('Half Life'));
+    }
+
+    public function testNormalizeFoldsLookAlikeQuotesAndDashes(): void
+    {
+        foreach (["\u{2019}", "\u{2018}", "\u{201B}", "\u{02BC}", "\u{2032}", '`', "\u{00B4}"] as $quote) {
+            $this->assertSame(Title::normalize("Baldur's Gate"), Title::normalize("Baldur{$quote}s Gate"), $quote);
+        }
+        foreach (["\u{201C}", "\u{201D}", "\u{201E}", "\u{201F}", "\u{2033}"] as $quote) {
+            $this->assertSame(Title::normalize('"Tag"'), Title::normalize("{$quote}Tag{$quote}"), $quote);
+        }
+        foreach (["\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2015}", "\u{2212}"] as $dash) {
+            $this->assertSame(Title::normalize('Half-Life'), Title::normalize("Half{$dash}Life"), $dash);
+        }
+    }
+
+    public function testFoldingDoesNotChangeTheStoredTitle(): void
+    {
+        $this->assertSame("Baldur\u{2019}s Gate", Title::clean("Baldur\u{2019}s Gate"));
     }
 
     /** @return array<string, array{mixed}> */

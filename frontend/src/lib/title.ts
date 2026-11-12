@@ -10,8 +10,26 @@ export function cleanTitle(raw: string): string {
     .trim()
 }
 
+/**
+ * Look-alike quotes and dashes, folded to one ASCII form for duplicate
+ * detection only. Kept in sync with Title::LOOKALIKES in the backend.
+ */
+const LOOKALIKES: readonly [RegExp, string][] = [
+  [/[‘’‛ʼ′`´]/gu, "'"],
+  [/[“”„‟″]/gu, '"'],
+  [/[‐-―−]/gu, '-'],
+]
+
+/**
+ * Mirrors the backend's duplicate key. Folding runs before NFKC, which
+ * would otherwise rewrite some of these (a double prime becomes two primes).
+ */
 export function normalizeTitle(raw: string): string {
-  return cleanTitle(raw).normalize('NFKC').toLowerCase()
+  const folded = LOOKALIKES.reduce(
+    (text, [pattern, plain]) => text.replace(pattern, plain),
+    cleanTitle(raw)
+  )
+  return folded.normalize('NFKC').toLowerCase()
 }
 
 /** Returns an error message, or null when the title looks acceptable. */

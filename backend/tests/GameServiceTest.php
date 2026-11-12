@@ -37,6 +37,17 @@ final class GameServiceTest extends DatabaseTestCase
         $this->assertSame(1, $this->eoa->countCalls('addGame'));
     }
 
+    public function testDuplicatesIgnoreCurlyQuotesAndDashVariants(): void
+    {
+        $this->services->games()->add($this->makeUser(), "Baldur\u{2019}s Gate \u{2013} Remastered");
+
+        $this->assertApiError(
+            'DUPLICATE_TITLE',
+            fn () => $this->services->games()->add($this->makeUser(), "baldur's gate - remastered")
+        );
+        $this->assertSame("Baldur\u{2019}s Gate \u{2013} Remastered", $this->services->games()->list(null)[0]['title']);
+    }
+
     public function testRejectedDuplicateDoesNotConsumeTheDailyAction(): void
     {
         $this->services->games()->add($this->makeUser(), 'Zelda');
