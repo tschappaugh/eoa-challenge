@@ -100,7 +100,7 @@ export function GameList({ library }: Props) {
               pending={library.pendingIds.has(game.id)}
               onVote={library.vote}
               onUnvote={library.unvote}
-              onRemove={(target) => setRemoving(target)}
+              onRemove={setRemoving}
             />
           ))}
         </ol>

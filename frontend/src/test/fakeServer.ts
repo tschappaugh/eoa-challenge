@@ -45,8 +45,9 @@ export function apiError(status: number, code: string, message: string) {
   return { status, body: { error: { code, message } } }
 }
 
+// Like the real server: most votes first, then oldest (lowest id) first.
 function sorted(games: Game[]): Game[] {
-  return [...games].sort((a, b) => b.votes - a.votes)
+  return [...games].sort((a, b) => b.votes - a.votes || a.id - b.id)
 }
 
 /** A tiny in-memory stand-in for the backend, behind a stubbed fetch. */

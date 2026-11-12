@@ -42,24 +42,28 @@ export function ConfirmDialog({
         event.preventDefault()
         onCancel()
       }}
+      // The content wrapper fills the dialog, so a click whose target is
+      // the dialog itself can only be on the backdrop.
       onClick={(event) => {
         if (event.target === ref.current) onCancel()
       }}
-      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-sm bg-surface p-6 text-ink backdrop:bg-black/50"
+      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-sm bg-surface p-0 text-ink backdrop:bg-black/50"
     >
-      <h2 id="confirm-title" className="text-lg font-semibold">
-        {title}
-      </h2>
-      <p id="confirm-description" className="mt-2 text-sm text-muted">
-        {description}
-      </p>
-      <div className="mt-6 flex flex-wrap justify-end gap-2">
-        <button type="button" className={secondaryButton} onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="button" className={dangerButton} onClick={onConfirm}>
-          {confirmLabel}
-        </button>
+      <div className="p-6">
+        <h2 id="confirm-title" className="text-lg font-semibold">
+          {title}
+        </h2>
+        <p id="confirm-description" className="mt-2 text-sm text-muted">
+          {description}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" className={secondaryButton} onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className={dangerButton} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </dialog>
   )

@@ -23,7 +23,9 @@ export function validateTitle(
 
   if (title === '') return 'Enter a game title.'
 
-  if (title.length > MAX_TITLE_LENGTH) {
+  // Count code points like the server's mb_strlen; .length counts UTF-16
+  // units, so an emoji would count twice.
+  if ([...title].length > MAX_TITLE_LENGTH) {
     return `Titles can be at most ${MAX_TITLE_LENGTH} characters.`
   }
 

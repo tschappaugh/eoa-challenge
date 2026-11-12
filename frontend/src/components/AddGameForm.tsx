@@ -86,7 +86,13 @@ export function AddGameForm({ library }: Props) {
           {library.adding ? 'Adding…' : 'Add game'}
         </button>
       </div>
-      <p id="title-error" className="min-h-5 text-sm font-medium text-danger">
+      {/* Live, because focusing an input that already has focus (Enter to
+          submit) does not make screen readers re-read its description. */}
+      <p
+        id="title-error"
+        aria-live="assertive"
+        className="min-h-5 text-sm font-medium text-danger"
+      >
         {error}
       </p>
     </form>

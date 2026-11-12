@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -90,6 +90,37 @@ describe('game list', () => {
     await user.click(screen.getByRole('button', { name: /try again/i }))
 
     expect(await screen.findByText('Zelda')).toBeInTheDocument()
+  })
+
+  it('shows the list again when an add works after a failed load', async () => {
+    const server = installFakeServer({ games: [zelda] })
+    server.failNext('GET /games', 'network')
+    const user = userEvent.setup()
+    render(<App />)
+    await expectAlert(/can't reach the server/i)
+
+    await user.type(screen.getByLabelText(/suggest a game/i), 'Metroid')
+    await user.click(screen.getByRole('button', { name: 'Add game' }))
+
+    const items = await listItems()
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Zelda'),
+      expect.stringContaining('Metroid'),
+    ])
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull()
+  })
+
+  it('breaks vote ties oldest first, like the server', async () => {
+    const newer = makeGame({ id: 5, title: 'Newer', votes: 2, votedByMe: true })
+    const older = makeGame({ id: 1, title: 'Older', votes: 1 })
+    const { server, user } = await renderApp({ games: [newer, older] })
+    server.hold('DELETE /games/5/vote')
+
+    await user.click(screen.getByRole('button', { name: 'Vote for Newer' }))
+
+    const items = await listItems()
+    expect(items[0]).toHaveTextContent('Older')
+    expect(items[1]).toHaveTextContent('Newer')
   })
 })
 
@@ -183,6 +214,51 @@ describe('voting', () => {
     ).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('ignores a refresh that would undo a newer pending change', async () => {
+    const { server, user } = await renderApp()
+    const releaseRefresh = server.hold('GET /games')
+    const releaseUnvote = server.hold('DELETE /games/3/vote')
+
+    await user.click(screen.getByRole('button', { name: 'Vote for Tetris' }))
+    await expectStatus('Voted for Tetris.')
+    // The vote's refresh is held; now undo the vote while it waits.
+    await user.click(screen.getByRole('button', { name: 'Vote for Tetris' }))
+
+    // The held refresh answers with the voted state from before the undo.
+    await act(async () => {
+      releaseRefresh()
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    const button = screen.getByRole('button', { name: 'Vote for Tetris' })
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+
+    releaseUnvote()
+    await expectStatus('Removed your vote for Tetris.')
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('a failed vote rolls back only itself, not a removal that worked', async () => {
+    const { server, user } = await renderApp()
+    const releaseVote = server.hold('POST /games/3/vote')
+    server.failNext('POST /games/3/vote', 'network')
+
+    await user.click(screen.getByRole('button', { name: 'Vote for Tetris' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Mario' }))
+    const dialog = await screen.findByRole('dialog', { name: /remove mario/i })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove game' })
+    )
+    await expectStatus('Mario was removed.')
+
+    releaseVote()
+
+    await expectAlert(/can't reach the server/i)
+    expect(screen.queryByText('Mario')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Vote for Tetris' })
+    ).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('shows the rate-limit message from the server', async () => {
     const { server, user } = await renderApp()
     server.failNext(
@@ -218,6 +294,11 @@ describe('adding a game', () => {
     expect(input).toHaveAccessibleDescription(/enter a game title/i)
     expect(input).toBeInvalid()
     expect(input).toHaveFocus()
+    // Announced even when Enter submits and focus doesn't move.
+    expect(screen.getByText(/enter a game title/i)).toHaveAttribute(
+      'aria-live',
+      'assertive'
+    )
 
     await user.type(input, 'a'.repeat(101))
     await user.click(add)
@@ -295,6 +376,23 @@ describe('removing a game', () => {
 
     expect(screen.getByText('Mario')).toBeInTheDocument()
     expect(server.calls.filter((c) => c.startsWith('DELETE'))).toEqual([])
+  })
+
+  it('stays open on clicks inside the panel, and closes on the backdrop', async () => {
+    const { user } = await renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Mario' }))
+    const dialog = await screen.findByRole('dialog', { name: /remove mario/i })
+    const panel = within(dialog).getByRole('heading').parentElement
+    if (!panel) throw new Error('dialog has no content wrapper')
+
+    await user.click(panel)
+    expect(dialog).toHaveAttribute('open')
+
+    // jsdom has no layout: a click targeting the <dialog> element itself is
+    // what the browser reports for a click on the backdrop.
+    await user.click(dialog)
+    await waitFor(() => expect(dialog).not.toHaveAttribute('open'))
   })
 
   it('removes the game after confirmation and moves focus to the list', async () => {

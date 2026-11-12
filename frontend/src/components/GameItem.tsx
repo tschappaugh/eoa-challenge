@@ -9,7 +9,7 @@ interface Props {
   pending: boolean
   onVote: (game: Game) => void
   onUnvote: (game: Game) => void
-  onRemove: (game: Game, trigger: HTMLButtonElement) => void
+  onRemove: (game: Game) => void
 }
 
 export function GameItem({
@@ -73,8 +73,8 @@ export function GameItem({
             type="button"
             aria-label={`Remove ${game.title}`}
             aria-disabled={pending}
-            onClick={(event) => {
-              if (!pending) onRemove(game, event.currentTarget)
+            onClick={() => {
+              if (!pending) onRemove(game)
             }}
             className={secondaryButton}
           >

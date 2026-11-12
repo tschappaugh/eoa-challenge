@@ -12,6 +12,11 @@ describe('validateTitle', () => {
     expect(validateTitle('a'.repeat(100), [])).toBeNull()
   })
 
+  it('counts characters like the server, so emoji count once', () => {
+    expect(validateTitle('🎮'.repeat(100), [])).toBeNull()
+    expect(validateTitle('🎮'.repeat(101), [])).toMatch(/at most 100/)
+  })
+
   it('rejects duplicates regardless of case, spacing, and Unicode form', () => {
     expect(validateTitle('  zelda ', ['Zelda'])).toMatch(/already/)
     expect(validateTitle('Super   Mario', ['super mario'])).toMatch(/already/)

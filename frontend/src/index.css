@@ -9,10 +9,8 @@
   --color-ink: #2d2d2d;
   --color-muted: #5b5348;
   --color-accent: #6f5b3e;
-  --color-brand: #8b7355;
   --color-danger: #9b2c2c;
+  --color-danger-hover: #7a2222;
   --color-danger-soft: #fdf2f2;
-  --color-success: #2d6a3d;
-  --color-success-soft: #f0f7f2;
   --color-notice-soft: #f5ebe0;
 }
