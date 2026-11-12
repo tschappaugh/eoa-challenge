@@ -34,8 +34,10 @@ final class GameService
     }
 
     /**
-     * Games sorted by votes (desc), then oldest first. Upstream is the source
-     * of truth for which games exist and their vote counts.
+     * Games sorted by votes (desc), then by local id: the order games reached
+     * this app, which the frontend can reproduce for its optimistic updates.
+     * Upstream is the source of truth for which games exist and their vote
+     * counts.
      *
      * Anonymous visitors (no identity yet) get the same list with nothing
      * marked as theirs.
@@ -60,7 +62,6 @@ final class GameService
                 continue;
             }
             $items[] = [
-                'apiId' => $game['id'],
                 'id' => $row['id'],
                 'title' => $row['title'],
                 'votes' => max(0, $game['votes']),
@@ -69,13 +70,9 @@ final class GameService
             ];
         }
 
-        usort($items, fn (array $a, array $b) => [$b['votes'], $a['apiId']] <=> [$a['votes'], $b['apiId']]);
+        usort($items, fn (array $a, array $b) => [$b['votes'], $a['id']] <=> [$a['votes'], $b['id']]);
 
-        return array_map(static function (array $item): array {
-            unset($item['apiId']);
-
-            return $item;
-        }, $items);
+        return $items;
     }
 
     /**

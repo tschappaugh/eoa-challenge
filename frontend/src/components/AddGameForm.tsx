@@ -12,10 +12,26 @@ interface Props {
 export function AddGameForm({ library }: Props) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [spoken, setSpoken] = useState<{ id: number; text: string } | null>(
+    null
+  )
   const inputRef = useRef<HTMLInputElement>(null)
 
   const limited = library.me?.actionAvailable === false
   const blocked = limited || library.adding
+
+  // Moving focus to the input makes screen readers read the error with its
+  // description. When the input already has focus (Enter to submit), focus
+  // can't move, so the error is spoken through the live region instead. A new
+  // id remounts the text, so a repeated message is announced again.
+  function showError(message: string) {
+    setError(message)
+    if (document.activeElement === inputRef.current) {
+      setSpoken((current) => ({ id: (current?.id ?? 0) + 1, text: message }))
+    } else {
+      inputRef.current?.focus()
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -27,8 +43,7 @@ export function AddGameForm({ library }: Props) {
     )
 
     if (problem) {
-      setError(problem)
-      inputRef.current?.focus()
+      showError(problem)
       return
     }
 
@@ -38,8 +53,7 @@ export function AddGameForm({ library }: Props) {
     if (result.ok) {
       setValue('')
     } else if (result.field) {
-      setError(result.message)
-      inputRef.current?.focus()
+      showError(result.message)
     }
   }
 
@@ -70,6 +84,7 @@ export function AddGameForm({ library }: Props) {
           onChange={(event) => {
             setValue(event.target.value)
             if (error) setError(null)
+            setSpoken(null)
           }}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
@@ -86,14 +101,11 @@ export function AddGameForm({ library }: Props) {
           {library.adding ? 'Adding…' : 'Add game'}
         </button>
       </div>
-      {/* Live, because focusing an input that already has focus (Enter to
-          submit) does not make screen readers re-read its description. */}
-      <p
-        id="title-error"
-        aria-live="assertive"
-        className="min-h-5 text-sm font-medium text-danger"
-      >
+      <p id="title-error" className="min-h-5 text-sm font-medium text-danger">
         {error}
+      </p>
+      <p aria-live="assertive" className="sr-only">
+        {spoken && <span key={spoken.id}>{spoken.text}</span>}
       </p>
     </form>
   )

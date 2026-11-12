@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -42,6 +49,13 @@ async function expectStatus(text: string) {
   await waitFor(() =>
     expect(screen.getByRole('status')).toHaveTextContent(text)
   )
+}
+
+/** The add form's assertive region, used when focus can't move. */
+function liveRegion() {
+  const region = document.querySelector('form [aria-live="assertive"]')
+  if (!region) throw new Error('no assertive live region in the form')
+  return region
 }
 
 async function listItems() {
@@ -90,6 +104,25 @@ describe('game list', () => {
     await user.click(screen.getByRole('button', { name: /try again/i }))
 
     expect(await screen.findByText('Zelda')).toBeInTheDocument()
+  })
+
+  it('shows the load error if the fetch that replaced the first load fails', async () => {
+    const server = installFakeServer({ games: [zelda] })
+    const releaseFirstLoad = server.hold('GET /games')
+    // The add's refresh is the second GET; it fails while the first waits.
+    server.failNext('GET /games', 'network')
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText(/suggest a game/i), 'Metroid')
+    await user.click(screen.getByRole('button', { name: 'Add game' }))
+    await expectStatus('Metroid was added.')
+    releaseFirstLoad()
+
+    expect(
+      await screen.findByRole('button', { name: /try again/i })
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Loading games…')).not.toBeInTheDocument()
   })
 
   it('shows the list again when an add works after a failed load', async () => {
@@ -259,6 +292,35 @@ describe('voting', () => {
     ).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('replays a refresh that was dropped while a later-failing write ran', async () => {
+    const used = makeMe({
+      actionAvailable: false,
+      action: { type: 'add', gameId: 2 },
+    })
+    const voted = makeGame({ id: 1, title: 'Zelda', votes: 3, votedByMe: true })
+    const { server, user } = await renderApp({
+      games: [voted, mario],
+      me: used,
+    })
+    const releaseUnvote = server.hold('DELETE /games/1/vote')
+    server.failNext('DELETE /games/1/vote', 'network')
+
+    await user.click(screen.getByRole('button', { name: 'Vote for Zelda' }))
+    // Removing today's game refunds the add on the server.
+    server.me = makeMe()
+    await user.click(screen.getByRole('button', { name: 'Remove Mario' }))
+    const dialog = await screen.findByRole('dialog', { name: /remove mario/i })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove game' })
+    )
+    await expectStatus('Mario was removed.')
+
+    releaseUnvote()
+
+    await expectAlert(/can't reach the server/i)
+    expect(await screen.findByText(/you can vote for one game/i)).toBeVisible()
+  })
+
   it('shows the rate-limit message from the server', async () => {
     const { server, user } = await renderApp()
     server.failNext(
@@ -294,11 +356,9 @@ describe('adding a game', () => {
     expect(input).toHaveAccessibleDescription(/enter a game title/i)
     expect(input).toBeInvalid()
     expect(input).toHaveFocus()
-    // Announced even when Enter submits and focus doesn't move.
-    expect(screen.getByText(/enter a game title/i)).toHaveAttribute(
-      'aria-live',
-      'assertive'
-    )
+    // Focus moved, so the description carries the error: nothing extra is
+    // spoken.
+    expect(liveRegion()).toBeEmptyDOMElement()
 
     await user.type(input, 'a'.repeat(101))
     await user.click(add)
@@ -310,6 +370,21 @@ describe('adding a game', () => {
     expect(input).toHaveAccessibleDescription(/already on the list/i)
 
     expect(server.calls.filter((c) => c.startsWith('POST'))).toEqual([])
+  })
+
+  it('speaks the error again on each Enter when focus cannot move', async () => {
+    const { user } = await renderApp()
+    await user.click(screen.getByLabelText(/suggest a game/i))
+
+    await user.keyboard('{Enter}')
+    const first = liveRegion().firstElementChild
+    expect(first).toHaveTextContent(/enter a game title/i)
+
+    await user.keyboard('{Enter}')
+    const second = liveRegion().firstElementChild
+    expect(second).toHaveTextContent(/enter a game title/i)
+    // A new node, so screen readers announce the repeat.
+    expect(second).not.toBe(first)
   })
 
   it('shows a server-side duplicate next to the field', async () => {
@@ -389,6 +464,12 @@ describe('removing a game', () => {
     await user.click(panel)
     expect(dialog).toHaveAttribute('open')
 
+    // A drag from the panel onto the backdrop clicks the <dialog> itself.
+    fireEvent.pointerDown(panel)
+    fireEvent.pointerUp(dialog)
+    fireEvent.click(dialog)
+    expect(dialog).toHaveAttribute('open')
+
     // jsdom has no layout: a click targeting the <dialog> element itself is
     // what the browser reports for a click on the backdrop.
     await user.click(dialog)
@@ -433,6 +514,28 @@ describe('removing a game', () => {
 
     await expectAlert(/only the person who added/i)
     expect(await screen.findByText('Mario')).toBeInTheDocument()
+  })
+})
+
+describe('removing a game that is already gone', () => {
+  it('does not put the row back when the server says NOT_FOUND', async () => {
+    const { server, user } = await renderApp()
+    server.failNext(
+      'DELETE /games/2',
+      apiError(404, 'NOT_FOUND', 'That game is no longer in the library.')
+    )
+    // Hold the resync so only the rollback could bring the row back.
+    const releaseResync = server.hold('GET /games')
+
+    await user.click(screen.getByRole('button', { name: 'Remove Mario' }))
+    const dialog = await screen.findByRole('dialog', { name: /remove mario/i })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove game' })
+    )
+
+    await expectAlert(/no longer in the library/i)
+    expect(screen.queryByText('Mario')).not.toBeInTheDocument()
+    releaseResync()
   })
 })
 

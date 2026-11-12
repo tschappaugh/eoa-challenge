@@ -22,20 +22,39 @@ const LIMIT_MESSAGE =
 // Codes the add form shows next to the field instead of in the page alert.
 const FIELD_CODES = ['VALIDATION_FAILED', 'DUPLICATE_TITLE']
 
-// Most votes first, then oldest (lowest id) first, matching the server.
+// Most votes first, then lowest id first: the same order the server uses.
 function sortByVotes(games: Game[]): Game[] {
   return [...games].sort((a, b) => b.votes - a.votes || a.id - b.id)
 }
 
-// Puts one game back exactly as it was, leaving every other game alone.
-function restoreGame(games: Game[], game: Game): Game[] {
+// Inserts or replaces one game, leaving every other game alone.
+function upsertGame(games: Game[], game: Game): Game[] {
   return sortByVotes([...games.filter((g) => g.id !== game.id), game])
+}
+
+// Puts back the fields that `change` altered, keeping any others that moved
+// on since (another action may have landed in the meantime).
+function revertFields<T extends object>(current: T, before: T, after: T): T {
+  const next = { ...current }
+  for (const key of Object.keys(before) as (keyof T)[]) {
+    if (!Object.is(before[key], after[key])) next[key] = before[key]
+  }
+  return next
 }
 
 interface OptimisticChange {
   games: (games: Game[]) => Game[]
   me?: (me: Me) => Me
+  /** NOT_FOUND means the game is gone, so don't put it back (removal). */
+  goneOnNotFound?: boolean
 }
+
+/**
+ * applied: the result is on screen. superseded: a newer fetch will decide.
+ * interrupted: a write started while this was in flight, so the result may
+ * undo it; fetch again once writes settle.
+ */
+type FetchOutcome = 'applied' | 'superseded' | 'interrupted'
 
 export function useGameLibrary() {
   const [status, setStatus] = useState<Status>('loading')
@@ -48,13 +67,17 @@ export function useGameLibrary() {
   const [adding, setAdding] = useState(false)
 
   const meRef = useRef(me)
+  const statusRef = useRef(status)
   const pendingRef = useRef(pendingIds)
-  const requestId = useRef(0)
+  const fetchId = useRef(0)
+  const writeEpoch = useRef(0)
   const writesInFlight = useRef(0)
+  const refreshOwed = useRef(false)
   const noticeId = useRef(0)
 
   useEffect(() => {
     meRef.current = me
+    statusRef.current = status
     pendingRef.current = pendingIds
   })
 
@@ -72,66 +95,83 @@ export function useGameLibrary() {
     })
   }, [])
 
-  /**
-   * Resolves to true when the result was applied. A response (or failure) is
-   * dropped when a newer fetch or an optimistic write started after it, or
-   * while a write is still in flight: it would undo that write's optimistic
-   * state. The write refreshes again when it finishes.
-   */
-  const fetchAll = useCallback(async (): Promise<boolean> => {
-    requestId.current += 1
-    const mine = requestId.current
-    const stale = () => mine !== requestId.current || writesInFlight.current > 0
+  const fetchAll = useCallback(async (): Promise<FetchOutcome> => {
+    fetchId.current += 1
+    const mine = fetchId.current
+    const epoch = writeEpoch.current
+    refreshOwed.current = false
+
+    const outcome = (): FetchOutcome | null => {
+      if (mine !== fetchId.current) return 'superseded'
+      if (epoch !== writeEpoch.current || writesInFlight.current > 0) {
+        refreshOwed.current = true
+        return 'interrupted'
+      }
+      return null
+    }
 
     let result: [Game[], Me]
     try {
       result = await Promise.all([api.getGames(), api.getMe()])
     } catch (error) {
-      if (stale()) return false
+      const dropped = outcome()
+      if (dropped) return dropped
       throw error
     }
-    if (stale()) return false
+    const dropped = outcome()
+    if (dropped) return dropped
 
     setGames(result[0])
     setMe(result[1])
-    return true
+    return 'applied'
   }, [])
 
-  const fetchInitial = useCallback(() => {
-    fetchAll().then(
-      (applied) => {
-        if (!applied) return
-        setStatus('ready')
-        setLoadError(null)
-      },
-      (error: unknown) => {
-        setLoadError(friendlyMessage(error))
-        setStatus('error')
-      }
-    )
+  // Fetches until a result can be applied, or until someone else will.
+  const settle = useCallback(async (): Promise<boolean> => {
+    for (;;) {
+      const outcome = await fetchAll()
+      if (outcome === 'applied') return true
+      // A newer fetch, or the last running write (see runOptimistic), takes
+      // over. Otherwise the write already finished: fetch again.
+      if (outcome === 'superseded' || writesInFlight.current > 0) return false
+    }
   }, [fetchAll])
+
+  /**
+   * Loads or re-syncs with the server. While no list has loaded yet a
+   * failure shows the load error (with Try again); after that it shows in
+   * the page alert and keeps the current view. A success clears a load error,
+   * e.g. when an add works once the server is back.
+   */
+  const refresh = useCallback(
+    () =>
+      settle().then(
+        (applied) => {
+          if (!applied) return
+          setStatus('ready')
+          setLoadError(null)
+        },
+        (error: unknown) => {
+          if (statusRef.current === 'ready') {
+            setActionError(friendlyMessage(error))
+          } else {
+            setLoadError(friendlyMessage(error))
+            setStatus('error')
+          }
+        }
+      ),
+    [settle]
+  )
 
   const load = useCallback(() => {
     setStatus('loading')
     setLoadError(null)
-    fetchInitial()
-  }, [fetchInitial])
-
-  // Quiet re-sync with the server after a change. A success also clears an
-  // earlier load error, e.g. when an add works once the server is back.
-  const refresh = useCallback(async () => {
-    try {
-      if (!(await fetchAll())) return
-      setStatus('ready')
-      setLoadError(null)
-    } catch (error) {
-      setActionError(friendlyMessage(error))
-    }
-  }, [fetchAll])
+    void refresh()
+  }, [refresh])
 
   useEffect(() => {
-    fetchInitial()
-  }, [fetchInitial])
+    void refresh()
+  }, [refresh])
 
   // The daily action returns at local midnight: re-check then.
   const resetsAt = me?.resetsAt
@@ -157,42 +197,44 @@ export function useGameLibrary() {
 
       const meBefore = meRef.current
       const changeMe = change.me
-      // Invalidates any fetch already in flight (see fetchAll).
-      requestId.current += 1
+      // A fetch already in flight now can't apply its result (see fetchAll).
+      writeEpoch.current += 1
       writesInFlight.current += 1
       setActionError(null)
       setPending(game.id, true)
       setGames(change.games)
       if (changeMe) setMe((current) => (current ? changeMe(current) : current))
 
+      let resync = false
       try {
         await send()
         announce(success)
-        void refresh()
+        resync = true
         return true
       } catch (error) {
+        const gone =
+          change.goneOnNotFound === true &&
+          error instanceof ApiError &&
+          error.code === 'NOT_FOUND'
         // Revert only what this action changed; other actions may have
         // landed since it started.
-        setGames((current) => restoreGame(current, game))
+        if (!gone) setGames((current) => upsertGame(current, game))
         if (changeMe && meBefore) {
+          const after = changeMe(meBefore)
           setMe((current) =>
-            current
-              ? {
-                  ...current,
-                  actionAvailable: meBefore.actionAvailable,
-                  action: meBefore.action,
-                }
-              : current
+            current ? revertFields(current, meBefore, after) : current
           )
         }
         setActionError(friendlyMessage(error))
-        if (shouldResync(error)) void refresh()
+        resync = shouldResync(error)
         return false
       } finally {
-        // Runs before the refresh above gets its response, so that refresh
-        // is not dropped as stale (unless another write is still going).
         writesInFlight.current -= 1
         setPending(game.id, false)
+        // Also replays a refresh that was dropped while this write ran.
+        if (resync || (refreshOwed.current && writesInFlight.current === 0)) {
+          void refresh()
+        }
       }
     },
     [announce, refresh, setPending]
@@ -255,7 +297,10 @@ export function useGameLibrary() {
     (game: Game): Promise<boolean> =>
       runOptimistic(
         game,
-        { games: (current) => current.filter((g) => g.id !== game.id) },
+        {
+          games: (current) => current.filter((g) => g.id !== game.id),
+          goneOnNotFound: true,
+        },
         () => api.removeGame(game.id),
         `${game.title} was removed.`
       ),
@@ -275,9 +320,7 @@ export function useGameLibrary() {
       try {
         const created = await api.addGame(title)
         // A refresh may already have brought the new game in.
-        setGames((current) =>
-          sortByVotes([...current.filter((g) => g.id !== created.id), created])
-        )
+        setGames((current) => upsertGame(current, created))
         setMe((current) =>
           current
             ? {

@@ -24,6 +24,10 @@ export function ConfirmDialog({
   onCancel,
 }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
+  // A drag from the panel to the backdrop (or back) also produces a click on
+  // the <dialog>, so both ends of the press must be on the backdrop.
+  const pressedBackdrop = useRef(false)
+  const releasedBackdrop = useRef(false)
 
   useEffect(() => {
     const dialog = ref.current
@@ -42,10 +46,22 @@ export function ConfirmDialog({
         event.preventDefault()
         onCancel()
       }}
-      // The content wrapper fills the dialog, so a click whose target is
+      // The content wrapper fills the dialog, so an event whose target is
       // the dialog itself can only be on the backdrop.
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.target === ref.current
+      }}
+      onPointerUp={(event) => {
+        releasedBackdrop.current = event.target === ref.current
+      }}
       onClick={(event) => {
-        if (event.target === ref.current) onCancel()
+        const backdrop =
+          event.target === ref.current &&
+          pressedBackdrop.current &&
+          releasedBackdrop.current
+        pressedBackdrop.current = false
+        releasedBackdrop.current = false
+        if (backdrop) onCancel()
       }}
       className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-sm bg-surface p-0 text-ink backdrop:bg-black/50"
     >

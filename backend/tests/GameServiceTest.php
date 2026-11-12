@@ -123,6 +123,20 @@ final class GameServiceTest extends DatabaseTestCase
         $this->assertSame(['Beta', 'Alpha', 'Gamma', 'Delta'], $titles);
     }
 
+    public function testTiesFollowLocalIdEvenWhenUpstreamOrderDiffers(): void
+    {
+        $user = $this->makeUser();
+        // Created upstream first, but only imported (given a local id) on the
+        // next list, after our own add.
+        $this->eoa->seed('Outside');
+        $ours = $this->services->games()->add($user, 'Ours');
+
+        $games = $this->services->games()->list($user);
+
+        $this->assertSame(['Ours', 'Outside'], array_column($games, 'title'));
+        $this->assertLessThan($games[1]['id'], $ours['id']);
+    }
+
     public function testListImportsGamesAddedElsewhereAndDecodesTheirNames(): void
     {
         $this->eoa->seed('Tom & Jerry <3');
