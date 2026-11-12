@@ -7,8 +7,9 @@ CREATE TABLE users (
 
 -- api_id is NULL while a title is reserved and the upstream add is in flight.
 -- created_by is NULL for games imported from the API (added outside this app).
--- title_normalized is trimmed, whitespace-collapsed, and lowercased in PHP;
--- the binary collation makes the unique index an exact match on that value.
+-- title_normalized is the duplicate key from Title::normalize (cleaned, quotes
+-- and dashes folded, NFKC, case-folded). The binary collation makes the
+-- unique index an exact match on that value.
 CREATE TABLE games (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   api_id INT UNSIGNED NULL UNIQUE,

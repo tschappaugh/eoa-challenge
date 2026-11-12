@@ -1,8 +1,16 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-sand-50: #f8f6f2;
-  --color-sand-200: #e8e0d8;
-  --color-sand-600: #8b7355;
+  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --color-page: #f8f6f2;
+  --color-surface: #ffffff;
+  --color-line: #e8e0d8;
+  --color-control: #8a7a66;
   --color-ink: #2d2d2d;
+  --color-muted: #5b5348;
+  --color-accent: #6f5b3e;
+  --color-danger: #9b2c2c;
+  --color-danger-hover: #7a2222;
+  --color-danger-soft: #fdf2f2;
+  --color-notice-soft: #f5ebe0;
 }

@@ -1,0 +1,86 @@
+import { useEffect, useRef } from 'react'
+import { dangerButton, secondaryButton } from './styles'
+
+interface Props {
+  open: boolean
+  title: string
+  description: string
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+/**
+ * Native modal dialog: the browser traps focus, closes on Escape, and makes
+ * the rest of the page inert. Cancel comes first so it gets initial focus,
+ * which is the safe default for a destructive action.
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: Props) {
+  const ref = useRef<HTMLDialogElement>(null)
+  // A drag from the panel to the backdrop (or back) also produces a click on
+  // the <dialog>, so both ends of the press must be on the backdrop.
+  const pressedBackdrop = useRef(false)
+  const releasedBackdrop = useRef(false)
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-description"
+      onCancel={(event) => {
+        event.preventDefault()
+        onCancel()
+      }}
+      // The content wrapper fills the dialog, so an event whose target is
+      // the dialog itself can only be on the backdrop.
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.target === ref.current
+      }}
+      onPointerUp={(event) => {
+        releasedBackdrop.current = event.target === ref.current
+      }}
+      onClick={(event) => {
+        const backdrop =
+          event.target === ref.current &&
+          pressedBackdrop.current &&
+          releasedBackdrop.current
+        pressedBackdrop.current = false
+        releasedBackdrop.current = false
+        if (backdrop) onCancel()
+      }}
+      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-sm bg-surface p-0 text-ink backdrop:bg-black/50"
+    >
+      <div className="p-6">
+        <h2 id="confirm-title" className="text-lg font-semibold">
+          {title}
+        </h2>
+        <p id="confirm-description" className="mt-2 text-sm text-muted">
+          {description}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" className={secondaryButton} onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className={dangerButton} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  )
+}

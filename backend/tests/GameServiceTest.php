@@ -37,6 +37,17 @@ final class GameServiceTest extends DatabaseTestCase
         $this->assertSame(1, $this->eoa->countCalls('addGame'));
     }
 
+    public function testDuplicatesIgnoreCurlyQuotesAndDashVariants(): void
+    {
+        $this->services->games()->add($this->makeUser(), "Baldur\u{2019}s Gate \u{2013} Remastered");
+
+        $this->assertApiError(
+            'DUPLICATE_TITLE',
+            fn () => $this->services->games()->add($this->makeUser(), "baldur's gate - remastered")
+        );
+        $this->assertSame("Baldur\u{2019}s Gate \u{2013} Remastered", $this->services->games()->list(null)[0]['title']);
+    }
+
     public function testRejectedDuplicateDoesNotConsumeTheDailyAction(): void
     {
         $this->services->games()->add($this->makeUser(), 'Zelda');
@@ -121,6 +132,20 @@ final class GameServiceTest extends DatabaseTestCase
         $titles = array_column($this->services->games()->list($user), 'title');
 
         $this->assertSame(['Beta', 'Alpha', 'Gamma', 'Delta'], $titles);
+    }
+
+    public function testTiesFollowLocalIdEvenWhenUpstreamOrderDiffers(): void
+    {
+        $user = $this->makeUser();
+        // Created upstream first, but only imported (given a local id) on the
+        // next list, after our own add.
+        $this->eoa->seed('Outside');
+        $ours = $this->services->games()->add($user, 'Ours');
+
+        $games = $this->services->games()->list($user);
+
+        $this->assertSame(['Ours', 'Outside'], array_column($games, 'title'));
+        $this->assertLessThan($games[1]['id'], $ours['id']);
     }
 
     public function testListImportsGamesAddedElsewhereAndDecodesTheirNames(): void
