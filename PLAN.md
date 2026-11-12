@@ -240,6 +240,43 @@ Known limitations: cookie clearing still yields a new identity (accepted by
 the brief; rate limits bound the damage). Behind Docker Desktop all local
 clients share one IP, so rate limits are effectively global locally.
 
+## Frontend implementation notes (Phase 4)
+
+- **Structure:** `lib/` (API client, messages, title and time helpers),
+  `hooks/useGameLibrary` (all state: load, optimistic vote/unvote/remove,
+  add, resync), `components/` (LimitBanner, AddGameForm, GameList,
+  GameItem, ConfirmDialog, ErrorAlert, StatusRegion).
+- **Optimistic updates:** vote, unvote, and remove apply immediately and
+  roll back on failure; add waits for the server id. After every change a
+  quiet re-fetch reconciles with the server (it also picks up refunds).
+  Stale responses are discarded (newest request wins). Errors that mean the
+  view is stale (`DAILY_LIMIT_REACHED`, `ALREADY_VOTED`, `NOT_FOUND`)
+  trigger a resync.
+- **Daily limit UX:** a banner always states whether today's action is
+  available and, if not, when it unlocks (local time plus countdown). Vote
+  and Add use `aria-disabled` rather than `disabled`, so they stay
+  focusable; clicking explains why in the page alert and the button is
+  described by the banner. Removing a vote is never blocked. The banner
+  re-checks itself at the user's local midnight.
+- **Errors:** every failure is shown in words (network, rate limit, daily
+  limit, duplicate, upstream outage); field errors appear next to the
+  input, everything else in the page alert. No silent failures.
+- **Accessibility:** WCAG 2.2 AA. Semantic landmarks, one `h1`, skip link,
+  `aria-pressed` vote toggle whose accessible name contains its visible
+  label, native modal `<dialog>` (focus trap, Escape, Cancel focused
+  first), polite live region for confirmations, `role="alert"` for errors,
+  44 px minimum targets, visible focus rings, `prefers-reduced-motion`
+  respected. The brand tan `#8b7355` is 4.49:1 on white (just under AA), so
+  text uses `#6f5b3e` (6.5:1) and control borders use `#8a7a66` (3:1+).
+- **Testing:** Vitest + Testing Library against an in-memory fake of the
+  backend (real fetch client, real hook); axe checks in jsdom. Real Chrome
+  verification (not in CI) covered contrast, mobile layout, keyboard order,
+  and CSP, which jsdom can't.
+- **Bugs the tests and browser run caught:** a `setTimeout` delay over
+  2^31 ms fires immediately (clamped); sr-only name spans dropped their
+  space ("Votefor Zelda"), so buttons use `aria-label`; focus fell to
+  `<body>` after confirming a removal until the dialog closed.
+
 ## Secret handling
 
 The EOA API key must never be committed — not in code, config, or AI logs.

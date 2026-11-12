@@ -33,11 +33,17 @@ office library. The full plan and all product decisions are in
 - **Gotcha:** EOA API keys expire (a key from the previous day was
   rejected). If the API starts answering `INVALID_KEY`, generate a new key
   into `.env` without printing it and run `docker-compose up -d php`.
-- **In review (branch `fix/hardening`, uncommitted until the user reviews):**
-  security and best-practice fixes from the Opus review. See PLAN.md ->
-  "Security hardening".
-- **Not done:** frontend feature code; README; transcript export.
-- **Next:** user reviews and commits `fix/hardening`, then `feat/frontend`.
+- **Done (hardening, merged):** security review fixes and CI (five green
+  jobs: backend, frontend, docker, secret scan, dependency audit).
+- **Done (frontend, branch `feat/frontend`):** React UI for the full feature
+  set (ranked list, add form, vote toggle, creator-only remove with confirm
+  dialog, daily-limit banner with countdown, loading/empty/error states,
+  optimistic updates with rollback). 43 Vitest tests pass; also verified in
+  real Chrome (axe: 0 violations incl. contrast, mobile 390px, keyboard,
+  focus, CSP clean).
+- **Not done:** README, final transcript export, fresh-clone verification.
+- **Next:** merge `feat/frontend`, then `docs/submission` (README, a11y pass,
+  scrubbed transcript, fresh-clone `docker-compose up` check).
 
 ## Frontend contract (from hardening)
 
