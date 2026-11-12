@@ -42,6 +42,11 @@ check hook-blocks-key 1 $?
 git -C "$tmp" reset -q; git -C "$tmp" add -f .env
 (cd "$tmp" && "$OLDPWD/scripts/git-hooks/pre-commit" 2>/dev/null)
 check hook-blocks-env 1 $?
+git -C "$tmp" reset -q
+printf '"content-hash": "%s"\n' "$FAKE" > "$tmp/composer.lock"
+git -C "$tmp" add composer.lock
+(cd "$tmp" && "$OLDPWD/scripts/git-hooks/pre-commit" 2>/dev/null)
+check hook-allows-lockfile-hash 0 $?
 git -C "$tmp" reset -q; git -C "$tmp" add clean.txt
 (cd "$tmp" && "$OLDPWD/scripts/git-hooks/pre-commit" 2>/dev/null)
 check hook-allows-clean 0 $?
