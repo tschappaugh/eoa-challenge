@@ -25,15 +25,23 @@ office library. The full plan and all product decisions are in
   passing. Backend skeleton in `backend/src` (Config, Database, Json,
   AppFactory with JSON error handler); frontend is Vite + React + TS +
   Tailwind v4 with a placeholder App.
-- **Not done:** all feature code (API client, services, routes, UI).
-- **Next:** merge `chore/scaffold`, then `feat/backend`. See PLAN.md ->
+- **Done (Phase 3 backend, branch `feat/backend`):** domain helpers
+  (Title, Clock), repositories, EOA client (`GuzzleEoaClient`), services
+  (Game, Vote, DailyLimit), identity-cookie middleware and routes
+  (`/api/me`, `/api/games`, vote endpoints). 71 PHPUnit tests pass against a
+  real MySQL test DB; verified live against the EOA API.
+- **Gotcha:** EOA API keys expire (a key from the previous day was
+  rejected). If the API starts answering `INVALID_KEY`, generate a new key
+  into `.env` without printing it and run `docker-compose up -d php`.
+- **Not done:** frontend feature code; README; transcript export.
+- **Next:** merge `feat/backend`, then `feat/frontend`. See PLAN.md ->
   Phases.
 
 ## Commands
 
 ```bash
 docker-compose up -d --build        # app at http://localhost:8080
-docker-compose exec php vendor/bin/phpunit   # backend tests
+docker-compose exec php vendor/bin/phpunit   # backend tests (uses gamevoting_test DB)
 cd frontend && npm test             # frontend tests
 cd frontend && npm run dev          # Vite dev server (proxies /api to :8080)
 ```

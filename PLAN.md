@@ -187,11 +187,31 @@ All write endpoints take **form-encoded** bodies; JSON bodies fail.
 | Id parsing | Loose: `id=2abc` acts as 2, `id=1.5` as 1 | Validate integer ids ourselves before forwarding |
 | Auth errors | `400 {"error":"MISSING_KEY"}`, `403 {"error":"INVALID_KEY"}` | Map to `UPSTREAM_UNAVAILABLE` for users; log the cause |
 | Wrong method / unknown route | HTML error page (405/404) | Client must handle non-JSON responses |
+| Key lifetime | A key generated on Nov 11 was rejected (`INVALID_KEY`) the next day | Keys expire. The client logs a hint ("generate a new key, set `EOA_API_KEY`, restart php"); users just see the friendly upstream error. README must tell reviewers to generate a fresh key |
 | Isolation | Each key has its own library | Test data was flushed after probing; library is empty |
 
 Compensation notes: undoing an add is `/games/remove`; undoing a vote is
 `/games/removeVote`. Both are safe to call after a local failure because the
 counters are anonymous and floor at 0.
+
+## Backend implementation notes (Phase 3)
+
+- **Write path:** claim locally in one transaction, call the API, undo the
+  claim if the call fails. Remove-game is the exception: it calls the API
+  first (nothing to roll back if it fails; a later list sync heals any
+  local leftovers).
+- **List sync:** the API decides which games exist and their vote counts.
+  Each list call imports games added elsewhere (no owner, so not removable;
+  duplicate titles get a `#<apiId>` suffix in `title_normalized`) and purges
+  local rows that vanished upstream, with a 60 s grace period so a game
+  added a moment ago is never purged by a stale list.
+- **Tests:** unit tests for titles, clock and the EOA client; DB-backed
+  tests (real MySQL, `gamevoting_test`) for the daily rule, refunds,
+  ownership and upstream failures; HTTP tests for identity cookies and the
+  error shape. `FakeEoa` mimics the observed API quirks.
+- **Known limitation:** the same-user concurrency guarantee rests on the
+  `(user_id, local_date)` primary key; it is exercised sequentially in
+  tests, not with parallel connections.
 
 ## Secret handling
 
