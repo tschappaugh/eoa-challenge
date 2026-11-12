@@ -9,12 +9,13 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use App\AppFactory;
+use Tests\Support\FakeEoa;
 
 final class HealthTest extends TestCase
 {
     public function testHealthIsOkWhenDatabaseResponds(): void
     {
-        $app = AppFactory::create(fn () => new PDO('sqlite::memory:'));
+        $app = AppFactory::create(fn () => new PDO('sqlite::memory:'), new FakeEoa());
 
         $response = $app->handle((new ServerRequestFactory())->createServerRequest('GET', '/api/health'));
 
@@ -24,7 +25,7 @@ final class HealthTest extends TestCase
 
     public function testHealthIsDegradedWhenDatabaseFails(): void
     {
-        $app = AppFactory::create(fn () => throw new RuntimeException('down'));
+        $app = AppFactory::create(fn () => throw new RuntimeException('down'), new FakeEoa());
 
         $response = $app->handle((new ServerRequestFactory())->createServerRequest('GET', '/api/health'));
 
@@ -33,7 +34,7 @@ final class HealthTest extends TestCase
 
     public function testUnknownRouteReturnsJsonError(): void
     {
-        $app = AppFactory::create(fn () => new PDO('sqlite::memory:'));
+        $app = AppFactory::create(fn () => new PDO('sqlite::memory:'), new FakeEoa());
 
         $response = $app->handle((new ServerRequestFactory())->createServerRequest('GET', '/api/nope'));
 

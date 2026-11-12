@@ -6,6 +6,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- api_id is NULL while a title is reserved and the upstream add is in flight.
+-- created_by is NULL for games imported from the API (added outside this app).
 -- title_normalized is trimmed, whitespace-collapsed, and lowercased in PHP;
 -- the binary collation makes the unique index an exact match on that value.
 CREATE TABLE games (
@@ -13,7 +14,7 @@ CREATE TABLE games (
   api_id INT UNSIGNED NULL UNIQUE,
   title VARCHAR(100) NOT NULL,
   title_normalized VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
-  created_by CHAR(36) NOT NULL,
+  created_by CHAR(36) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_games_user FOREIGN KEY (created_by) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
