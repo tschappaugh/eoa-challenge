@@ -38,7 +38,7 @@ jobs:
       DB_USER: gamevoting
       DB_PASSWORD: gamevoting
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
@@ -50,7 +50,6 @@ jobs:
       - run: vendor/bin/phpcs
       - run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress
       - run: vendor/bin/phpunit
-      - run: composer audit
 
   frontend:
     name: Frontend (lint, test, build)
@@ -59,8 +58,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -69,13 +68,12 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - run: npm audit --omit=dev
 
   docker:
     name: Docker images build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build all images
         env:
           EOA_API_KEY: placeholder
@@ -85,7 +83,7 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Repo redaction tests
@@ -94,3 +92,42 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Separate from the build jobs: these call the Packagist and npm advisory
+  # APIs, so a registry outage must not turn the build red. Real findings
+  # still fail this job.
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - name: Composer audit
+        working-directory: backend
+        run: |
+          set +e
+          composer audit --locked
+          code=$?
+          # Exit code 100 is a Composer runtime error such as an unreachable API.
+          if [ "$code" -eq 100 ]; then
+            echo "::warning::composer audit could not reach Packagist; skipped"
+            exit 0
+          fi
+          exit "$code"
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          set +e
+          npm audit --omit=dev --json > "$RUNNER_TEMP/npm-audit.json"
+          # An "error" key means the registry could not be queried.
+          if jq -e '.error' "$RUNNER_TEMP/npm-audit.json" > /dev/null 2>&1; then
+            echo "::warning::npm audit could not reach the registry; skipped"
+            exit 0
+          fi
+          npm audit --omit=dev
