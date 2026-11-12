@@ -28,7 +28,12 @@ final class ApiErrorMiddleware implements MiddlewareInterface
                 error_log('Upstream problem: ' . $e->getPrevious()->getMessage());
             }
 
-            return Json::error($this->responses->createResponse(), $e->errorCode, $e->getMessage(), $e->status);
+            $response = Json::error($this->responses->createResponse(), $e->errorCode, $e->getMessage(), $e->status);
+            foreach ($e->headers as $name => $value) {
+                $response = $response->withHeader($name, $value);
+            }
+
+            return $response;
         }
     }
 }

@@ -22,6 +22,23 @@ final class TitleTest extends TestCase
         $this->assertSame(Title::normalize('ÉCLAIR'), Title::normalize('éclair'));
     }
 
+    public function testUnicodeVariantsOfTheSameTitleAreDuplicates(): void
+    {
+        $composed = "Pok\u{00E9}mon";      // é as one code point
+        $decomposed = "Poke\u{0301}mon";   // e + combining acute accent
+        $this->assertSame(Title::normalize($composed), Title::normalize($decomposed));
+
+        $fullWidth = "\u{FF3A}\u{FF45}\u{FF4C}\u{FF44}\u{FF41}";
+        $this->assertSame(Title::normalize('Zelda'), Title::normalize($fullWidth));
+        $this->assertSame(Title::normalize('Strasse'), Title::normalize("Stra\u{00DF}e"));
+        $this->assertSame(Title::normalize('Zelda'), Title::normalize("Zel\u{200B}da ")); // zero-width space
+    }
+
+    public function testCleanStoresTheCanonicalComposedForm(): void
+    {
+        $this->assertSame("Pok\u{00E9}mon", Title::clean("Poke\u{0301}mon"));
+    }
+
     public function testNormalizeKeepsDifferentTitlesDistinct(): void
     {
         $this->assertNotSame(Title::normalize('Zelda'), Title::normalize('Zelda 2'));

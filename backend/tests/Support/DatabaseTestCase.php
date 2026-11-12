@@ -89,6 +89,14 @@ abstract class DatabaseTestCase extends TestCase
         return (int) $stmt->fetchColumn();
     }
 
+    protected function rowCount(string $table): int
+    {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM `$table`");
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
     protected function actionCount(User $user): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM daily_actions WHERE user_id = ?');

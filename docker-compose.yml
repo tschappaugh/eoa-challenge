@@ -11,7 +11,8 @@ services:
   php:
     build:
       context: ./backend
-    environment:
+      target: prod
+    environment: &php-env
       DB_HOST: db
       DB_NAME: ${DB_NAME:-gamevoting}
       DB_USER: ${DB_USER:-gamevoting}
@@ -19,6 +20,18 @@ services:
       EOA_API_BASE_URL: ${EOA_API_BASE_URL:-https://codechallenge.essensedesigns.info}
       EOA_API_KEY: ${EOA_API_KEY:?Set EOA_API_KEY in .env (see .env.example)}
       APP_DEBUG: ${APP_DEBUG:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Test runner: docker-compose --profile test run --rm test
+  test:
+    profiles: ['test']
+    build:
+      context: ./backend
+      target: dev
+    command: ['vendor/bin/phpunit']
+    environment: *php-env
     depends_on:
       db:
         condition: service_healthy

@@ -213,6 +213,33 @@ counters are anonymous and floor at 0.
   `(user_id, local_date)` primary key; it is exercised sequentially in
   tests, not with parallel connections.
 
+## Security hardening (post-backend review)
+
+| # | Issue | Fix |
+| --- | --- | --- |
+| 1 | No `php.ini`: errors displayed in responses, not logged; PHP version exposed | `php.ini-production` plus overrides (`backend/docker/php.ini`) |
+| 2 | Writes accepted form/XML bodies; CSRF relied on SameSite alone | JSON-only bodies (415 otherwise); `X-Requested-With` required on writes; `Origin` must match the real host |
+| 3 | No security headers; per-user API responses cacheable; nginx version exposed | nosniff, DENY framing, Referrer-Policy, Permissions-Policy, strict CSP; `Cache-Control: no-store` on `/api`; `server_tokens off` |
+| 4 | Every cookie-less read created a users row | Identity is created on the first write only; reads get an anonymous view |
+| 5 | No rate limiting | nginx per-IP limits on `/api` (10 r/s overall, 30 writes/min) with a JSON 429 |
+| 6 | Unicode variants bypassed duplicate detection | NFC for storage; NFKC + case folding for comparison; format characters removed (intl) |
+| 7 | Cookie never `Secure` | `Secure` when served over HTTPS (scheme or `X-Forwarded-Proto`) |
+| 8 | Runtime image shipped dev deps and tests | Multi-stage Dockerfile: `prod` (no dev deps, tests, or Composer) and `dev` (Compose `test` profile) |
+| 9 | Required PHP extensions undeclared | `ext-intl`, `ext-mbstring`, `ext-pdo_mysql`, `ext-json` in `composer.json` |
+| 10 | Failed vote restore could turn a 502 into a 500 | Restore is best-effort and logged |
+| 11 | 1 MB request bodies allowed | 16 KB on `/api` |
+| 12 | Daily-limit 429 had no `Retry-After` | Seconds until the user's local midnight |
+| 13 | No CI; local pre-commit hook is bypassable | GitHub Actions: PHPCS, PHPStan, PHPUnit (MySQL service), composer/npm audit, frontend lint/test/build, image build, gitleaks over full history (custom EOA key rule in `.gitleaks.toml`) |
+| 14 | No static analysis | PHPStan level 8 and PHPCS PSR-12, both clean |
+
+Found during live verification: Slim's PSR-7 request rewrites `Host` without
+the port, so the origin check compares against the raw `HTTP_HOST`. Tests
+now build requests the same way production does.
+
+Known limitations: cookie clearing still yields a new identity (accepted by
+the brief; rate limits bound the damage). Behind Docker Desktop all local
+clients share one IP, so rate limits are effectively global locally.
+
 ## Secret handling
 
 The EOA API key must never be committed — not in code, config, or AI logs.
@@ -231,7 +258,8 @@ The EOA API key must never be committed — not in code, config, or AI logs.
 4. **Transcript export:** `scripts/scrub-transcript.sh` applies the same
    redaction to the final `/export` before it is committed.
 5. **Pre-commit hook:** blocks any commit whose staged diff contains the key
-   value or a key-shaped string.
+   value or a key-shaped string. CI backs this up with gitleaks over the
+   full history, since local hooks can be skipped.
 6. **If a key leaks:** discard it and generate a new one. Rewriting git
    history alone is not enough.
 

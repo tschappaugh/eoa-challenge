@@ -67,14 +67,15 @@ final class GameRepository
     /** @return array<int, array{id: int, api_id: ?int, title: string, created_by: ?string}> keyed by api_id */
     public function synced(): array
     {
-        $rows = $this->pdo->query(
-            'SELECT id, api_id, title, created_by FROM games WHERE api_id IS NOT NULL'
-        )->fetchAll();
+        $stmt = $this->pdo->prepare('SELECT id, api_id, title, created_by FROM games WHERE api_id IS NOT NULL');
+        $stmt->execute();
 
         $byApiId = [];
-        foreach ($rows as $row) {
+        foreach ($stmt->fetchAll() as $row) {
             $game = $this->hydrate($row);
-            $byApiId[$game['api_id']] = $game;
+            if ($game['api_id'] !== null) {
+                $byApiId[$game['api_id']] = $game;
+            }
         }
 
         return $byApiId;
@@ -83,11 +84,17 @@ final class GameRepository
     /** @return list<string> */
     public function reservedTitles(): array
     {
-        return $this->pdo->query('SELECT title_normalized FROM games WHERE api_id IS NULL')
-            ->fetchAll(PDO::FETCH_COLUMN);
+        $stmt = $this->pdo->prepare('SELECT title_normalized FROM games WHERE api_id IS NULL');
+        $stmt->execute();
+
+        return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
-    /** Remove local rows whose upstream game is gone (ignoring brand-new ones). */
+    /**
+     * Remove local rows whose upstream game is gone (ignoring brand-new ones).
+     *
+     * @param list<int> $upstreamIds
+     */
     public function purgeMissing(array $upstreamIds): void
     {
         $sql = 'DELETE FROM games WHERE api_id IS NOT NULL AND created_at < (NOW() - INTERVAL '
@@ -97,7 +104,7 @@ final class GameRepository
             $sql .= ' AND api_id NOT IN (' . implode(',', array_fill(0, count($upstreamIds), '?')) . ')';
         }
 
-        $this->pdo->prepare($sql)->execute(array_values($upstreamIds));
+        $this->pdo->prepare($sql)->execute($upstreamIds);
     }
 
     /** Add an upstream-only game locally. It has no owner, so nobody can remove it. */

@@ -28,7 +28,10 @@ final class GameServiceTest extends DatabaseTestCase
         $this->services->games()->add($this->makeUser(), 'Super Mario');
 
         foreach (['super mario', 'SUPER MARIO', '  Super   Mario  '] as $variant) {
-            $this->assertApiError('DUPLICATE_TITLE', fn () => $this->services->games()->add($this->makeUser(), $variant));
+            $this->assertApiError(
+                'DUPLICATE_TITLE',
+                fn () => $this->services->games()->add($this->makeUser(), $variant)
+            );
         }
         $this->assertCount(1, $this->eoa->games);
         $this->assertSame(1, $this->eoa->countCalls('addGame'));
@@ -158,6 +161,17 @@ final class GameServiceTest extends DatabaseTestCase
         $this->assertSame($mine['id'], $games['Mine']['id']);
     }
 
+    public function testAnonymousVisitorsSeeTheListWithNothingMarkedAsTheirs(): void
+    {
+        $this->services->games()->add($this->makeUser(), 'Zelda');
+
+        $games = $this->services->games()->list(null);
+
+        $this->assertCount(1, $games);
+        $this->assertFalse($games[0]['canRemove']);
+        $this->assertFalse($games[0]['votedByMe']);
+    }
+
     public function testListFailsCleanlyWhenUpstreamIsDown(): void
     {
         $this->eoa->down = true;
@@ -196,7 +210,9 @@ final class GameServiceTest extends DatabaseTestCase
         $user = $this->makeUser();
         $this->services->games()->list($user);
 
-        $this->assertApiError('NOT_OWNER', fn () => $this->services->games()->remove($user, $this->gameId('Elsewhere')));
+        $id = $this->gameId('Elsewhere');
+
+        $this->assertApiError('NOT_OWNER', fn () => $this->services->games()->remove($user, $id));
     }
 
     public function testOwnerRemovesTheGameEverywhereAndItsVotesGoWithIt(): void
@@ -210,7 +226,7 @@ final class GameServiceTest extends DatabaseTestCase
 
         $this->assertSame([], $this->eoa->games);
         $this->assertSame(0, $this->gameId('Zelda'));
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM votes')->fetchColumn());
+        $this->assertSame(0, $this->rowCount('votes'));
     }
 
     public function testRemovingTodaysGameRefundsTheOwnersAddAndTodaysVoters(): void

@@ -10,10 +10,14 @@ use Throwable;
 /** A failure we want to show to the user as a structured JSON error. */
 final class ApiException extends RuntimeException
 {
+    /**
+     * @param array<string, string> $headers extra response headers
+     */
     private function __construct(
         public readonly string $errorCode,
         string $message,
         public readonly int $status,
+        public readonly array $headers = [],
         ?Throwable $previous = null,
     ) {
         parent::__construct($message, 0, $previous);
@@ -24,17 +28,32 @@ final class ApiException extends RuntimeException
         return new self('VALIDATION_FAILED', $message, 422);
     }
 
+    public static function unsupportedMediaType(): self
+    {
+        return new self('UNSUPPORTED_MEDIA_TYPE', 'Requests must be sent as JSON.', 415);
+    }
+
+    public static function requestRejected(): self
+    {
+        return new self(
+            'REQUEST_REJECTED',
+            'This request was blocked for security reasons. Please reload the page and try again.',
+            403
+        );
+    }
+
     public static function duplicateTitle(): self
     {
         return new self('DUPLICATE_TITLE', 'That game is already on the list.', 409);
     }
 
-    public static function dailyLimit(): self
+    public static function dailyLimit(int $retryAfterSeconds): self
     {
         return new self(
             'DAILY_LIMIT_REACHED',
             "You've already used today's vote or game suggestion. Come back after midnight.",
-            429
+            429,
+            ['Retry-After' => (string) max(1, $retryAfterSeconds)]
         );
     }
 
@@ -59,6 +78,7 @@ final class ApiException extends RuntimeException
             'UPSTREAM_UNAVAILABLE',
             'The game library is unavailable right now. Please try again in a moment.',
             502,
+            [],
             $previous
         );
     }

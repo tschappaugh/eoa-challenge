@@ -33,15 +33,29 @@ office library. The full plan and all product decisions are in
 - **Gotcha:** EOA API keys expire (a key from the previous day was
   rejected). If the API starts answering `INVALID_KEY`, generate a new key
   into `.env` without printing it and run `docker-compose up -d php`.
+- **In review (branch `fix/hardening`, uncommitted until the user reviews):**
+  security and best-practice fixes from the Opus review. See PLAN.md ->
+  "Security hardening".
 - **Not done:** frontend feature code; README; transcript export.
-- **Next:** merge `feat/backend`, then `feat/frontend`. See PLAN.md ->
-  Phases.
+- **Next:** user reviews and commits `fix/hardening`, then `feat/frontend`.
+
+## Frontend contract (from hardening)
+
+- Every write (POST/DELETE) must send `X-Requested-With: XMLHttpRequest`;
+  `POST /api/games` must send `Content-Type: application/json`.
+- Send `X-Timezone` (IANA name from `Intl.DateTimeFormat`) on every
+  request; it is saved on the user's first write.
+- 429 can mean `DAILY_LIMIT_REACHED` (has `Retry-After` in seconds) or
+  `RATE_LIMITED` (from nginx); branch on `error.code`, not the status.
+- Never render game titles with `dangerouslySetInnerHTML` (titles are
+  stored decoded). The CSP allows only same-origin scripts and styles.
 
 ## Commands
 
 ```bash
 docker-compose up -d --build        # app at http://localhost:8080
-docker-compose exec php vendor/bin/phpunit   # backend tests (uses gamevoting_test DB)
+docker-compose --profile test run --rm test # backend tests (gamevoting_test DB)
+docker-compose --profile test run --rm test composer check  # phpcs + phpstan + phpunit
 cd frontend && npm test             # frontend tests
 cd frontend && npm run dev          # Vite dev server (proxies /api to :8080)
 ```
