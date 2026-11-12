@@ -33,6 +33,11 @@ final class Clock
         return $this->local($zone)->setTime(0, 0)->modify('+1 day');
     }
 
+    public function secondsUntilMidnight(User|string $zone): int
+    {
+        return $this->nextMidnight($zone)->getTimestamp() - $this->now()->getTimestamp();
+    }
+
     private function local(User|string $zone): DateTimeImmutable
     {
         $name = $zone instanceof User ? $zone->timezone : $zone;

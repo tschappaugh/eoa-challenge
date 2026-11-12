@@ -19,12 +19,12 @@ final class GuzzleEoaClientTest extends TestCase
 {
     private const KEY = 'unit-test-key-value';
 
-    /** @var list<array{request: Request}> */
-    private array $history = [];
+    /** @var array<mixed>|\ArrayAccess<int, array<mixed>> */
+    private array|\ArrayAccess $history = [];
 
     private function client(Response|ConnectException ...$responses): GuzzleEoaClient
     {
-        $stack = HandlerStack::create(new MockHandler($responses));
+        $stack = HandlerStack::create(new MockHandler(array_values($responses)));
         $stack->push(Middleware::history($this->history));
 
         return new GuzzleEoaClient(
@@ -35,7 +35,7 @@ final class GuzzleEoaClientTest extends TestCase
 
     private function json(mixed $data, int $status = 200): Response
     {
-        return new Response($status, ['Content-Type' => 'application/json'], json_encode($data));
+        return new Response($status, ['Content-Type' => 'application/json'], (string) json_encode($data));
     }
 
     public function testListGamesMapsTheResponse(): void
@@ -49,7 +49,8 @@ final class GuzzleEoaClientTest extends TestCase
     {
         $this->client($this->json(['id' => 4]))->addGame('Zelda');
 
-        $request = $this->history[0]['request'];
+        $request = $this->history[0]['request'] ?? null;
+        $this->assertInstanceOf(Request::class, $request);
         $this->assertSame('POST', $request->getMethod());
         $this->assertSame('/games/add', $request->getUri()->getPath());
         $this->assertStringContainsString('application/x-www-form-urlencoded', $request->getHeaderLine('Content-Type'));

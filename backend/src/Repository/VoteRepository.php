@@ -24,7 +24,15 @@ final class VoteRepository
         $stmt->execute([$userId, $gameId]);
         $row = $stmt->fetch();
 
-        return $row ? ['user_id' => $row['user_id'], 'game_id' => (int) $row['game_id'], 'cast_local_date' => $row['cast_local_date']] : null;
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'user_id' => (string) $row['user_id'],
+            'game_id' => (int) $row['game_id'],
+            'cast_local_date' => (string) $row['cast_local_date'],
+        ];
     }
 
     /** @throws ApiException ALREADY_VOTED */
@@ -56,7 +64,7 @@ final class VoteRepository
         $stmt = $this->pdo->prepare('SELECT game_id FROM votes WHERE user_id = ?');
         $stmt->execute([$userId]);
 
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /** @return list<array{user_id: string, cast_local_date: string, timezone: string}> */
@@ -69,6 +77,10 @@ final class VoteRepository
         );
         $stmt->execute([$gameId]);
 
-        return $stmt->fetchAll();
+        return array_values(array_map(static fn (array $row): array => [
+            'user_id' => (string) $row['user_id'],
+            'cast_local_date' => (string) $row['cast_local_date'],
+            'timezone' => (string) $row['timezone'],
+        ], $stmt->fetchAll()));
     }
 }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Db;
-use App\Exception\ApiException;
 use PDO;
 use PDOException;
 
@@ -19,8 +18,8 @@ final class DailyActionRepository
     {
     }
 
-    /** @throws ApiException DAILY_LIMIT_REACHED when the day's action is taken */
-    public function claim(string $userId, string $date, string $type, ?int $refId): void
+    /** @return bool false when the user has already used that day's action */
+    public function claim(string $userId, string $date, string $type, ?int $refId): bool
     {
         try {
             $this->pdo->prepare(
@@ -28,11 +27,13 @@ final class DailyActionRepository
             )->execute([$userId, $date, $type, $refId]);
         } catch (PDOException $e) {
             if (Db::isDuplicate($e)) {
-                throw ApiException::dailyLimit();
+                return false;
             }
 
             throw $e;
         }
+
+        return true;
     }
 
     /** @return array{type: string, ref_id: ?int}|null */
@@ -44,7 +45,14 @@ final class DailyActionRepository
         $stmt->execute([$userId, $date]);
         $row = $stmt->fetch();
 
-        return $row ? ['type' => $row['type'], 'ref_id' => $row['ref_id'] === null ? null : (int) $row['ref_id']] : null;
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'type' => (string) $row['type'],
+            'ref_id' => $row['ref_id'] === null ? null : (int) $row['ref_id'],
+        ];
     }
 
     public function setRef(string $userId, string $date, int $refId): void

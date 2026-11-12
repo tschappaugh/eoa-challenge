@@ -14,6 +14,7 @@ use App\Repository\DailyActionRepository;
 use App\Repository\GameRepository;
 use App\Repository\VoteRepository;
 use PDO;
+use Throwable;
 
 final class VoteService
 {
@@ -43,7 +44,9 @@ final class VoteService
 
         // One transaction: the day's action and the vote are both taken or neither.
         Db::transaction($this->pdo, function () use ($user, $gameId, $today): void {
-            $this->actions->claim($user->id, $today, 'vote', $gameId);
+            if (!$this->actions->claim($user->id, $today, 'vote', $gameId)) {
+                throw ApiException::dailyLimit($this->clock->secondsUntilMidnight($user));
+            }
             $this->votes->insert($user->id, $gameId, $today);
         });
 
@@ -66,12 +69,16 @@ final class VoteService
      * Removing a vote never costs an action. If the vote was cast today the
      * day's action is handed back (undo); older votes refund nothing.
      */
-    public function removeVote(User $user, int $gameId): void
+    public function removeVote(?User $user, int $gameId): void
     {
         $game = $this->games->find($gameId);
 
         if ($game === null || $game['api_id'] === null) {
             throw ApiException::notFound();
+        }
+
+        if ($user === null) {
+            throw ApiException::notFound("You haven't voted for this game.");
         }
 
         $today = $this->clock->today($user);
@@ -112,18 +119,25 @@ final class VoteService
         });
     }
 
+    /**
+     * Best effort: put the vote (and today's action) back after the upstream
+     * un-vote failed. If that is no longer possible, for example because the
+     * game was removed meanwhile, log it and let the caller report the
+     * original upstream error rather than a 500.
+     */
     private function restoreVote(User $user, int $gameId, string $castDate, string $today): void
     {
-        Db::transaction($this->pdo, function () use ($user, $gameId, $castDate, $today): void {
-            $this->votes->insert($user->id, $gameId, $castDate);
+        try {
+            Db::transaction($this->pdo, function () use ($user, $gameId, $castDate, $today): void {
+                $this->votes->insert($user->id, $gameId, $castDate);
 
-            if ($castDate === $today) {
-                try {
+                // false means the freed action was already used again; keep the vote anyway.
+                if ($castDate === $today) {
                     $this->actions->claim($user->id, $today, 'vote', $gameId);
-                } catch (ApiException) {
-                    // The freed action was already used again; keep the vote anyway.
                 }
-            }
-        });
+            });
+        } catch (Throwable $e) {
+            error_log(sprintf('Could not restore vote for game %d: %s', $gameId, $e->getMessage()));
+        }
     }
 }

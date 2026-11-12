@@ -16,18 +16,24 @@ final class DailyLimitService
     ) {
     }
 
-    /** @return array<string, mixed> */
-    public function status(User $user): array
+    /**
+     * Visitors without an identity haven't acted yet, so their action is
+     * available; their day is computed from the zone the browser reports.
+     *
+     * @return array<string, mixed>
+     */
+    public function status(?User $user, string $fallbackZone = 'UTC'): array
     {
-        $today = $this->clock->today($user);
-        $action = $this->actions->find($user->id, $today);
+        $zone = $user !== null ? $user->timezone : $fallbackZone;
+        $today = $this->clock->today($zone);
+        $action = $user === null ? null : $this->actions->find($user->id, $today);
 
         return [
-            'timezone' => $user->timezone,
+            'timezone' => $zone,
             'localDate' => $today,
             'actionAvailable' => $action === null,
             'action' => $action === null ? null : ['type' => $action['type'], 'gameId' => $action['ref_id']],
-            'resetsAt' => $this->clock->nextMidnight($user)->format(DATE_ATOM),
+            'resetsAt' => $this->clock->nextMidnight($zone)->format(DATE_ATOM),
         ];
     }
 }

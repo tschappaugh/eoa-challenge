@@ -37,9 +37,12 @@ final class GameService
      * Games sorted by votes (desc), then oldest first. Upstream is the source
      * of truth for which games exist and their vote counts.
      *
+     * Anonymous visitors (no identity yet) get the same list with nothing
+     * marked as theirs.
+     *
      * @return list<array{id: int, title: string, votes: int, votedByMe: bool, canRemove: bool}>
      */
-    public function list(User $user): array
+    public function list(?User $user): array
     {
         try {
             $upstream = $this->eoa->listGames();
@@ -48,7 +51,7 @@ final class GameService
         }
 
         $local = $this->sync($upstream);
-        $voted = array_flip($this->votes->votedGameIds($user->id));
+        $voted = $user === null ? [] : array_flip($this->votes->votedGameIds($user->id));
 
         $items = [];
         foreach ($upstream as $game) {
@@ -62,7 +65,7 @@ final class GameService
                 'title' => $row['title'],
                 'votes' => max(0, $game['votes']),
                 'votedByMe' => isset($voted[$row['id']]),
-                'canRemove' => $row['created_by'] === $user->id,
+                'canRemove' => $user !== null && $row['created_by'] === $user->id,
             ];
         }
 
@@ -87,7 +90,9 @@ final class GameService
         // Claim the day's action and the title in one transaction: if either
         // fails, neither is consumed.
         $gameId = Db::transaction($this->pdo, function () use ($user, $today, $title, $normalized): int {
-            $this->actions->claim($user->id, $today, 'add', null);
+            if (!$this->actions->claim($user->id, $today, 'add', null)) {
+                throw ApiException::dailyLimit($this->clock->secondsUntilMidnight($user));
+            }
 
             return $this->games->reserve($title, $normalized, $user->id);
         });
@@ -117,7 +122,7 @@ final class GameService
     }
 
     /** Only the user who added a game may remove it. */
-    public function remove(User $user, int $gameId): void
+    public function remove(?User $user, int $gameId): void
     {
         $game = $this->games->find($gameId);
 
@@ -129,7 +134,7 @@ final class GameService
             throw ApiException::notOwner("This game wasn't added through this app, so it can't be removed here.");
         }
 
-        if ($game['created_by'] !== $user->id) {
+        if ($user === null || $game['created_by'] !== $user->id) {
             throw ApiException::notOwner('Only the person who added a game can remove it.');
         }
 
