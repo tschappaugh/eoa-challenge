@@ -61,14 +61,17 @@ Browser (React SPA) ──/api──▶ nginx ──▶ PHP-FPM (Slim 4) ──�
 
 ### Write path
 
-1. Validate business rules against MySQL.
+1. Claim locally in one transaction (the day's action plus the vote or the
+   title), so concurrent requests can't both pass the rules.
 2. Call the EOA API.
-3. Commit the local DB transaction.
+3. If the call fails, undo the local claim and show a friendly error. If a
+   later local step fails after the API succeeded, compensate upstream
+   (`remove` after a failed add).
 
-- If the API call fails, nothing is written locally and the user sees a
-  friendly error.
-- If the API succeeds but the DB commit fails, the API change is compensated
-  (e.g. `removeVote` after a failed vote record, `remove` after a failed add).
+Removing a game is the exception: it calls the API first, then cleans up
+locally; a later list sync heals any leftover. (This replaces the original
+"validate, call, then commit" sketch: claiming first is what makes the daily
+rule hold under concurrency.)
 
 ### API key
 

@@ -31,8 +31,9 @@ office library. The full plan and all product decisions are in
   (`/api/me`, `/api/games`, vote endpoints). 71 PHPUnit tests pass against a
   real MySQL test DB; verified live against the EOA API.
 - **Gotcha:** EOA API keys expire (a key from the previous day was
-  rejected). If the API starts answering `INVALID_KEY`, generate a new key
-  into `.env` without printing it and run `docker-compose up -d php`.
+  rejected), and each key has its own library. If the API starts answering
+  `INVALID_KEY`, run `scripts/generate-key.sh` (never prints the key) and
+  `docker-compose up -d php`.
 - **Done (hardening, merged):** security review fixes and CI (five green
   jobs: backend, frontend, docker, secret scan, dependency audit).
 - **Done (frontend, merged):** React UI for the full feature set (ranked
@@ -42,14 +43,24 @@ office library. The full plan and all product decisions are in
   compared with look-alike quotes and dashes folded, and Rank / A-Z sorting
   (`feat/sort`, merged). Verified in real Chrome (axe: 0 violations incl.
   contrast, mobile 390px, keyboard, focus, CSP clean).
-- **In progress (design, branch `feat/design`):** Montserrat (self-hosted),
-  new heading and intro copy, header with "Code Challenge" on the right, and
-  an intro image beside the text (above it on mobile). Further design work
-  may follow on this branch. Tests: 74 Vitest.
-- **Not done:** README, final transcript export, fresh-clone verification.
-- **Next:** finish and merge `feat/design`, then `docs/submission` (README,
-  a11y pass, scrubbed transcript, fresh-clone `docker-compose up` check).
-  Run the backend tests with `--build` so the test image isn't stale.
+- **Done (design, merged):** Montserrat (self-hosted), new heading and intro
+  copy, header with "Code Challenge" on the right, intro image beside the
+  text (above it on mobile). CI now runs on every branch push.
+- **Done (final review, merged):** full-repo security and best-practices
+  pass (secrets, dependencies, code, Docker, CI); Node 20 (EOL) replaced by
+  Node 24; nginx gzip for static files. Recorded in PLAN.md -> "Final
+  review".
+- **Done (submission, branch `docs/submission`):** README for reviewers,
+  `scripts/generate-key.sh` (writes a new key to `.env` without printing
+  it), checkmark favicon, illustration credit (Unsplash), PLAN.md
+  write-path correction. Quick start verified from a fresh clone of the
+  branch, following only the README. The user reviewed the code before the
+  final merge.
+- **Submission state:** complete. Tests: 86 PHPUnit, 74 Vitest; CI green
+  (five jobs, every push). The AI record is `ai-logs/`: the live session
+  log (complete, written by the hook) and `transcript.md` (the final
+  `/export`, scrubbed with `scripts/scrub-transcript.sh`).
+- Run the backend tests with `--build` so the test image isn't stale.
 
 ## Frontend contract (from hardening)
 

@@ -1,0 +1,5379 @@
+
+✻ Conversation compacted (ctrl+o for history)
+
+
+⏺ Yes. The stack is running and serving the app at http://localhost:8080/. The
+  page loads, /api/health returns ok, and the game library is empty because I
+  cleaned up my test data.
+
+  Before you try it
+  - Time zone and daily limit: the app saves your browser's time zone the first
+    time you add a game or vote, and your "day" follows it.
+  - One action per day: the first thing you do, adding or voting, uses up your
+    action until local midnight.
+  - Testing more than once: use a private/incognito window or clear the uid
+    cookie to get a fresh identity. Each window has its own limit. You can also
+    open one normal and one private window to see two users interact, for
+    example to vote on someone else's game or confirm that Remove only appears
+    on your own.
+  - Fast clicking: nginx allows 30 writes per minute, so rapid testing can
+    briefly show a "Too many requests" message. It clears within a minute.
+  - API key: the app needs a valid EOA key in .env. The current one works, but
+    if it expires you'll see "The game library is unavailable". Generate a new
+    key into .env and run docker-compose up -d php. I can do that for you.
+
+  If it isn't running
+  cd ~/Websites/eoa-challenge
+  docker-compose up -d --build
+
+  The running site was built from feat/frontend, so it matches what you'd get
+  after merging.
+
+❯ I have reviewed the game page. I checked game play and the features.
+  Everything worked as described. I want to push this branch up to GitHub but
+  not merge into main. There are a few changes we may make and I would like to
+  review the code with Opus.
+  ⎿  Read frontend/src/components/GameList.tsx (120 lines)
+  ⎿  Read frontend/src/components/GameItem.tsx (88 lines)
+  ⎿  Read backend/tests/HttpTest.php (315 lines)
+  ⎿  Read backend/src/Domain/Title.php (67 lines)
+  ⎿  Read ../../.claude/projects/-Users-tonyschappaugh-Websites-eoa-challenge/me
+     mory/feedback-git-push-merge-manual.md (16 lines)
+
+⏺ Compacted using a summary written while you were away · turn off with
+  "idleCompaction": false in settings.json
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current && git status
+      --short | head && git log --oneline -3)
+  ⎿  (No output)
+
+⏺ You're on feat/frontend. The frontend is committed as 85e4460. The only
+  uncommitted change is the live AI session log, which keeps growing. I don't
+  push, per your standing rule, so run these yourself to publish the branch
+  without merging:
+
+  cd ~/Websites/eoa-challenge
+  git add ai-logs && git commit -m "chore: update AI session log"
+  git push -u origin feat/frontend
+
+  main stays untouched. When the Opus review is done and any fixes are in, merge
+  with:
+
+  git checkout main
+  git merge --no-ff feat/frontend
+  git push
+
+  For the review itself, open a fresh Opus session, or switch with /model in
+  this one. The submission requires a single session, so staying in this one is
+  better. In that case, switch to Opus, then run /code-review high against the
+  branch. The diff to review is main..feat/frontend. It's all frontend code
+  under frontend/src, plus the CLAUDE.md and PLAN.md updates.
+
+  Any fixes from the review can go on a fix/frontend-review branch off
+  feat/frontend, so the pushed branch stays a clean snapshot of what you tested.
+
+❯ would it be better to do that review locally before we push to github
+
+⏺ Yes, I'd review locally first, and it's a small preference rather than a
+  strong one.
+
+  Why local first
+  - If Opus finds problems, you can fix them as commits on feat/frontend before
+    anything is published. You then push once, with the fixes already in.
+  - If you push first, each fix adds another push and another CI run.
+  - Nothing is lost by waiting. The work is committed locally, and the review
+    only reads the diff.
+
+  Why you might push first
+  - It's a backup, and CI runs on the branch before review. I don't remember
+    whether our workflow triggers on feature branches or only on pushes to main
+    and PRs, so check .github/workflows/ci.yml if CI feedback matters to you.
+  - Pushing has no effect on main.
+
+  Either way, the review fixes are visible in the history, and the submission
+  includes the transcript. Local review doesn't hide anything. It only means the
+  pushed branch is tidier.
+
+  Suggested order:
+  1. Commit the AI log: git add ai-logs && git commit -m "chore: update AI
+     session log".
+  2. Switch to Opus with /model, then run /code-review high. The diff is
+     main..feat/frontend.
+  3. Fix the findings with commits on feat/frontend. I'll commit locally and
+     won't push.
+  4. Push feat/frontend once, check CI, then merge.
+
+  If you'd rather keep the reviewed snapshot separate from the fixes, use a
+  fix/frontend-review branch as I suggested before. Otherwise I'd keep it simple
+  and commit the fixes on the same branch.
+
+❯ I will do my work on the local branch before committing to GitHub.
+
+⏺ Sounds good. Everything stays local on feat/frontend until you push it.
+
+  When you're ready, switch to Opus with /model and run /code-review high. I'll
+  make the fixes and commit them locally, and I won't push. Remember to commit
+  the AI log first so the transcript stays current.
+
+❯ switching to Opus
+
+⏺ Go ahead. Once you're on Opus, run /code-review high. The diff is
+  main..feat/frontend. Tell me which findings to fix and I'll commit them
+  locally on feat/frontend.
+
+❯ /model opus
+  ⎿  Set model to claude-opus-5-5
+
+❯ /code-review high
+  ⎿  10 findings, most severe first:
+
+     1. frontend/src/hooks/useGameLibrary.ts:96: The quiet refresh() never moves status out of 'error'. AddGameForm still renders while the list shows its load error, so a successful add can't bring the list back.
+
+        Failure scenario: The first GET /api/games fails (upstream down), so status is 'error' and AddGameForm stays visible because App renders it unconditionally. The upstream recovers and the user adds a game. add() succeeds, and refresh() loads the games and sets them in state, but status stays 'error'. GameList keeps showing the stale load error and hides the list (including the game just added) until the user clicks 'Try again'.
+     2. frontend/src/components/ConfirmDialog.tsx:46: The backdrop-click check event.target === ref.current also matches clicks on the dialog's own p-6 padding and on empty space inside it, so clicking inside the dialog cancels it.
+
+        Failure scenario: The user opens 'Remove X?' and clicks the blank area next to the description or between the buttons. The click target is the <dialog> element itself, so onCancel fires and the dialog closes even though the click was inside the panel. The fix is to check the click coordinates against dialog.getBoundingClientRect(), or to put the content in an inner wrapper that fills the dialog.
+     3. frontend/src/hooks/useGameLibrary.ts:141: On failure, runOptimistic restores whole-list games and me snapshots taken when the operation started. That wipes out any other operation that succeeded or was applied in the meantime.
+
+        Failure scenario: The user removes game B (pending) and quickly unvotes game A. B's DELETE succeeds, B is removed from the list and a refresh runs. A's unvote then fails with NETWORK_ERROR, which does not trigger a resync, and setGames(snapshot.games) restores a list taken before B's removal landed. B reappears and stays until the next refresh. The rollback should revert only the affected game (for example by mapping over current), not swap in the whole old array.
+     4. frontend/src/hooks/useGameLibrary.ts:75: The requestId check only orders fetches against each other. A refresh started after one action can overwrite the optimistic state of a later action that is still in flight.
+
+        Failure scenario: The user votes for A. It succeeds and refresh() starts. pending clears in finally, so the user clicks again to unvote A, and the optimistic state shows 0 votes and not voted. The earlier refresh response (server state from before the unvote) arrives and setGames puts the vote back while the DELETE is still pending, so the toggle flickers and the count is wrong until the next refresh. Optimistic writes should bump requestId, or the code should skip applying fetches while any id is pending.
+     5. frontend/src/lib/title.ts:26: The client checks title length with title.length (UTF-16 code units), but the backend uses mb_strlen (code points), so valid titles with astral characters are rejected on the client.
+
+        Failure scenario: A title with 60 emoji or other astral-plane characters is 60 code points, which the server's Title::validate accepts (<= 100), but its .length is 120. validateTitle returns 'Titles can be at most 100 characters.' and the request is never sent. Using [...title].length would match the server.
+     6. frontend/src/components/AddGameForm.tsx:31: Field errors are not announced when the form is submitted with Enter, because focus() on an input that already has focus does nothing and the #title-error paragraph is not a live region.
+
+        Failure scenario: A screen-reader user types a duplicate title and presses Enter. setError fills #title-error and inputRef.focus() is a no-op because the input is already focused, so nothing is re-read and the user gets no feedback (WCAG 4.1.3 Status Messages). The same thing happens for server-side VALIDATION_FAILED and DUPLICATE_TITLE errors after the await. Adding role="alert" or aria-live to the error element would fix it.
+     7. frontend/src/hooks/useGameLibrary.ts:79: A stale fetch can still decide status and errors. fetchAll returns normally after discarding a stale result, and its rejections skip the requestId check entirely, so fetchInitial and refresh act on outdated requests.
+
+        Failure scenario: Under StrictMode the mount effect runs twice, so two fetchInitial calls overlap. The second succeeds and sets status 'ready'. The first then rejects (for example after the 15s timeout) and sets status 'error' with a loadError, hiding a list that loaded fine. In the same way, a stale refresh() that fails sets actionError after a newer refresh has already succeeded.
+     8. frontend/src/hooks/useGameLibrary.ts:26: sortByVotes breaks ties by current array position, but the server breaks them by upstream id (oldest first), so the optimistic order differs from the server order and the list jumps when the refresh lands.
+
+        Failure scenario: The list is [B(new, 2 votes), A(old, 1 vote)] and the user unvotes B. The stable sort keeps [B(1), A(1)], but the server returns [A, B] because A is older. Ranks 1 and 2 swap when the refresh completes. The comment 'like the server' is wrong; the sort needs an explicit secondary key.
+     9. frontend/src/components/GameItem.tsx:77: GameItem passes event.currentTarget as a trigger argument to onRemove, but GameList's handler (target) => setRemoving(target) ignores it, so the parameter is dead.
+
+        Failure scenario: The trigger: HTMLButtonElement in Props and the currentTarget plumbing suggest focus is returned to the trigger, but nothing reads it (focus goes to the heading instead). Future maintainers will misread how focus is handled. Remove the parameter from Props and the call site.
+     10. frontend/src/index.css:12: The new theme tokens --color-brand, --color-success and --color-success-soft are not used by any component, and dangerButton hard-codes hover:bg-[#7a2222] instead of a token.
+
+         Failure scenario: The unused tokens are dead config that ends up in the generated theme, while the one hover color that needs a token is an arbitrary hex value outside the palette. Palette changes then have to be made in two places, and the dead entries make it unclear which tokens are actually in use.
+
+❯ Please make these fixes. when finished explain each fix so I can revew the
+  diff on each file. Wait on staging and commiting the fixes.
+
+  Read 6 files (ctrl+o to expand)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rnE "brand|success|notice-soft"
+      frontend/src --include=*.tsx --include=*.ts | grep -v "success:" | head;
+      grep -rn "usort\|s…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rnE "brand|success|notice-soft"
+      frontend/src | grep -vE "ok: true|success\b:|success: string|success\)" ;
+      grep -n "id" fron…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && cat frontend/src/lib/types.ts; grep -rn
+      "brand\|success-soft\|7a2222" PLAN.md CLAUDE.md frontend/src; grep -rn
+      "onRemove\|sortByV…)
+  ⎿  No matches found
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && grep -n
+      "alert\|title-error\|errorAlert\|function \|StrictMode" src/App.test.tsx |
+      head -60; sed -n 262,275p ../PLAN.md)
+  ⎿  (No output)
+
+⏺ Fixes are under way. I'm checking which tests depend on the alert role before
+  editing.
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && sed -n 1,200p
+      src/test/fakeServer.ts; sed -n 1,19p src/App.test.tsx; sed -n 279,400p
+      src/App.test.tsx)
+  ⎿  (No output)
+
+⏺ Writing the hook changes now: per-game rollback, fetch guards, tie-break sort,
+  and status recovery.
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      import re…)
+  ⎿  No matches found
+
+⏺ That ok reuse in the rollback block is muddled. Rewriting it cleanly:
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      163        setGames(change.games)
+      164        if (changeMe) setMe((current) => (current ? changeMe(cur
+           rent) : current))
+      165  
+      166 -      let ok = false                                          
+      166        try {
+      167          await send()
+      169 -        ok = true                                             
+      168          announce(success)
+      169 +        void refresh()                                        
+      170 +        return true                                           
+      171        } catch (error) {
+      172          // Revert only what this action changed; other actions
+            may have
+      173          // landed since it started.
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)
+  ⎿  Added 4 lines, removed 5 lines
+      184            )
+      185          }
+      186          setActionError(friendlyMessage(error))
+      187 -        ok = !shouldResync(error)                             
+      187 +        if (shouldResync(error)) void refresh()               
+      188 +        return false                                          
+      189        } finally {
+      190 +        // Runs before the refresh above gets its response, so
+          + that refresh                                                 
+      191 +        // is not dropped as stale (unless another write is st
+          +ill going).                                                   
+      192          writesInFlight.current -= 1
+      193          setPending(game.id, false)
+      194        }
+      192 -                                                              
+      193 -      // `ok` is reused here: refresh after a success, or afte
+          -r a failure                                                   
+      194 -      // that means our view is out of date.                  
+      195 -      return ok                                               
+      195      },
+      196      [announce, refresh, setPending]
+      197    )
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Now updating the vote, unvote, remove, and add call sites to the new shape:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/hooks/useGameLibrary.ts'…)
+  ⎿  (No output)
+
+⏺ gamesRef is unused now, so I'm removing it and then editing the other files.
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/hooks/useGameLibrary.ts'…)
+  ⎿  (No output)
+
+⏺ Source edits are in. Adding regression tests for the fixes next.
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && cat src/lib/title.test.ts | head
+      -40; cat package.json | grep -n "\"[a-z:]*\":" | head -20; ls .prettierrc*
+      2>/dev/null)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/lib/title.test.ts'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ All 49 tests pass. Checking whether that lint warning is new:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && sed -n 120,132p
+      src/hooks/useGameLibrary.ts; git stash -q && npm run lint 2>&1 | grep -c
+      warning; git stash pop -q && gi…)
+  ⎿  (No output)
+
+⏺ The warning is new: the linter now traces setStatus into fetchAll. I'll move
+  the status updates back into the callers.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)
+  ⎿  Added 15 lines, removed 7 lines
+      92  
+      93        setGames(nextGames)
+      94        setMe(nextMe)
+      95 -      setStatus('ready')                                       
+      96 -      setLoadError(null)                                       
+      95        return true
+      96      } catch (error) {
+      97        if (stale()) return false
+     ...
+       99      }
+      100    }, [])
+      101  
+      102 +  const markReady = useCallback(() => {                       
+      103 +    setStatus('ready')                                        
+      104 +    setLoadError(null)                                        
+      105 +  }, [])                                                      
+      106 +                                                              
+      107    const fetchInitial = useCallback(() => {
+      105 -    fetchAll().catch((error: unknown) => {                    
+      106 -      setLoadError(friendlyMessage(error))                    
+      107 -      setStatus('error')                                      
+      108 -    })                                                        
+      109 -  }, [fetchAll])                                              
+      108 +    fetchAll().then(                                          
+      109 +      (applied) => {                                          
+      110 +        if (applied) markReady()                              
+      111 +      },                                                      
+      112 +      (error: unknown) => {                                   
+      113 +        setLoadError(friendlyMessage(error))                  
+      114 +        setStatus('error')                                    
+      115 +      }                                                       
+      116 +    )                                                         
+      117 +  }, [fetchAll, markReady])                                   
+      118  
+      119    const load = useCallback(() => {
+      120      setStatus('loading')
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      126    // earlier load error, e.g. when an add works once the serve
+           r is back.
+      127    const refresh = useCallback(async () => {
+      128      try {
+      129 -      await fetchAll()                                        
+      129 +      if (await fetchAll()) markReady()                       
+      130      } catch (error) {
+      131        setActionError(friendlyMessage(error))
+      132      }
+      133 -  }, [fetchAll])                                              
+      133 +  }, [fetchAll, markReady])                                   
+      134  
+      135    useEffect(() => {
+      136      fetchInitial()
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && npx prettier --write src
+      >/dev/null && npx tsc -b && npm run lint 2>&1 | grep -E
+      "warning|error|Found" ; npm test 2>&1 |…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ Still flagged. The linter treats the markReady helper as a synchronous
+  setState call, so I'll inline it.
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/hooks/useGameLibrary.ts'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The linter probably doesn't see the await inside try as an async boundary, so
+  I'm moving the state updates after the try block.
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)  ⎿  Added 7 lines, removed 9 lines
+       83      const mine = requestId.current
+       84      const stale = () => mine !== requestId.current || writesIn
+           Flight.current > 0
+       85  
+       86 +    let result: [Game[], Me]                                  
+       87      try {
+       87 -      const [nextGames, nextMe] = await Promise.all([         
+       88 -        api.getGames(),                                       
+       89 -        api.getMe(),                                          
+       90 -      ])                                                      
+       91 -      if (stale()) return false                               
+       92 -                                                              
+       93 -      setGames(nextGames)                                     
+       94 -      setMe(nextMe)                                           
+       95 -      return true                                             
+       88 +      result = await Promise.all([api.getGames(), api.getMe()]
+          +)                                                             
+       89      } catch (error) {
+       90        if (stale()) return false
+       91        throw error
+       92      }
+       93 +    if (stale()) return false                                 
+       94 +                                                              
+       95 +    setGames(result[0])                                       
+       96 +    setMe(result[1])                                          
+       97 +    return true                                               
+       98    }, [])
+       99  
+      100    const fetchInitial = useCallback(() => {
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && npx prettier --write src
+      >/dev/null && npx tsc -b && npm run lint 2>&1 | grep -E "warning|Found";
+      npm test 2>&1 | grep -…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ Lint is clean and all 49 tests pass. Next I'm checking that the new tests
+  actually fail against the old code:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && cp src/hooks/useGameLibrary.ts
+      /private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16730
+      bd4-8a39-42b0-8…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ All 7 new tests fail against the old code and pass with the fixes. Last step
+  is a check in real Chrome: I'll rebuild the web container and re-run the
+  earlier browser/axe script.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose up -d --build web 2>&1 |
+      tail -2; S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-chal
+      lenge/16730bd4-…)
+  ⎿  (No output)
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; sed -n 1,30p
+      $S/run.mjs)
+  ⎿  (No output)
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cat > $S/review.mjs
+      <<'EOF'
+      import {…)
+  ⎿  (No output)
+  ⎿  (timeout 2m)
+
+⏺ The dialog closed as expected, but my script crashed on a stale read, leaving
+  "Review Check Game" in the library. I'm removing only that game and leaving
+  the ones you added alone. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -n "function\|'/\|\"/"
+      backend/src/Eoa/GuzzleEoaClient.php | head -30; docker-compose exec -T db
+      sh -c 'mysql -uroot -p"$MYS…)
+  ⎿  Error: Exit code 1
+     20:    public function __construct(
+     26:    public static function create(string $baseUrl, string $apiKey): self
+     39:    public function listGames(): array
+     41:        $data = $this->post('/games/list');
+     64:    public function addGame(string $name): int
+     66:        $data = $this->post('/games/add', ['name' => $name]);
+     77:    public function vote(int $id): bool
+     79:        return $this->succeeded($this->post('/games/vote', ['id' =>
+     $id]));
+     82:    public function removeVote(int $id): bool
+     … +5 lines (ctrl+o to expand)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -n "CREATE TABLE\|uuid\|created_by"
+      backend/migrations/001_init.sql; grep -n "MYSQL" docker-compose.yml
+      .env.example | sed '…)
+  ⎿  (No output)
+
+⏺ Each game's created_by holds its creator's cookie id. I'll look up the creator
+  of game 21 and delete it through the app's own owner-only endpoint:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && UID_=$(docker-compose exec -T db sh -c
+      'mysql -N -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT
+      created_by FROM…)
+  ⎿  (No output)
+
+⏺ Cleanup is done: the test game is gone from the EOA library and the local DB,
+  and the games you added are untouched. Here's the diff summary for your
+  review:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git diff --stat -- frontend)
+  ⎿  (No output)
+
+⏺ I fixed all 10 review findings and added 6 regression tests. They're unstaged
+  on feat/frontend for your review. All 49 frontend tests pass, typecheck and
+  lint are clean, and Prettier has been applied. The 7 tests that cover these
+  findings (6 new, plus an added check in an existing one) all failed when I ran
+  them against the old code.
+
+  I also checked the new dialog in real Chrome. Clicks on the panel padding and
+  on blank space inside it keep it open, a backdrop click closes it, and axe
+  finds 0 violations with the dialog open. My check script crashed after the
+  backdrop test and left a test game behind. I deleted it through the app as its
+  creator, and the games you added are untouched.
+
+  What changed, by file
+
+  frontend/src/hooks/useGameLibrary.ts
+
+  Findings 1, 3, 4, 7 and 8 are all fixed in this file.
+
+  - fetchAll (#4, #7): now returns true when it applied the result.
+    - It drops both responses and errors when a newer fetch started, or when any
+      optimistic write started or is still in flight.
+    - A new writesInFlight ref counts pending writes, and runOptimistic bumps
+      requestId when it starts.
+    - A dropped result is safe because the write refreshes again when it
+      finishes.
+    - The await sits in its own try, with state updates after it. The linter's
+      set-state-in-effect rule flagged the other layouts I tried.
+  - fetchInitial and refresh (#1, #7): both set status: 'ready' and clear
+    loadError only when the fetch was applied. A successful add or vote after a
+    failed load now brings the list back, and a stale failure can no longer
+    replace a list that loaded fine.
+  - runOptimistic (#3): now takes an OptimisticChange (games updater plus an
+    optional me updater) in place of an apply callback.
+    - On failure, the new restoreGame() puts back only that one game and leaves
+      every other game alone.
+    - It restores me.actionAvailable and me.action only for the action that
+      changed them (vote).
+    - The whole-list snapshot is gone, and so is the gamesRef ref, which nothing
+      used any more.
+  - sortByVotes (#8): ties now go to the lowest id first, matching the server's
+    oldest-first order.
+  - add: removes the new game's id before appending it, so a refresh that
+    already brought it in can't create a duplicate row.
+
+  frontend/src/components/ConfirmDialog.tsx (#2)
+
+  - The dialog is now p-0, and a new inner <div className="p-6"> holds the
+    content.
+  - Every click inside the panel lands on the wrapper or its children, so
+    event.target === dialog can only mean a backdrop click.
+  - The rest of the diff is the content moving down one indent level.
+
+  frontend/src/lib/title.ts (#5)
+
+  - The length check uses [...title].length (code points), matching the server's
+    mb_strlen.
+
+  frontend/src/components/AddGameForm.tsx (#6)
+
+  - #title-error has aria-live="assertive", so errors are announced when Enter
+    submits and focus doesn't move.
+  - I used aria-live instead of role="alert" so the field error stays separate
+    from the page alert. An existing test also expects exactly one alert.
+
+  frontend/src/components/GameItem.tsx and GameList.tsx (#9)
+
+  - Removed the unused trigger parameter. GameList now passes
+    onRemove={setRemoving}.
+
+  frontend/src/index.css and styles.ts (#10)
+
+  - Removed the unused --color-brand, --color-success and --color-success-soft
+    tokens.
+  - Added --color-danger-hover: #7a2222. dangerButton uses hover:bg-danger-hover
+    instead of the hard-coded hex.
+
+  Tests
+
+  - frontend/src/test/fakeServer.ts: the fake server breaks ties by lowest id
+    too, like the real backend.
+  - frontend/src/lib/title.test.ts: 100 emoji pass and 101 fail.
+  - frontend/src/App.test.tsx: new tests for:
+    - an add after a failed load showing the list again (#1)
+    - tie order (#8)
+    - a held refresh not undoing a pending unvote (#4)
+    - a failed vote not bringing back a removed game (#3)
+    - clicks inside the dialog versus the backdrop (#2)
+    - an aria-live assertion added to the existing validation test (#6)
+
+  PLAN.md still mentions the #8b7355 brand tan. That's the reason the palette
+  uses darker shades, so I left it.
+
+  Nothing is staged. When you're happy with the diff, let me know and I'll
+  commit.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/src/App.test.tsx in the
+  IDE. This may or may not be related to the current task.</ide_opened_file>
+
+❯ Stage and commit these changes on local only.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add frontend && git commit -q -F -
+      <<'EOF'
+      fix: address frontend review findings…)
+  ⎿  (No output)
+
+⏺ I committed the review fixes locally on feat/frontend as 34ce54e, and the
+  pre-commit secret check passed. The AI session log is in its own commit,
+  e8c4559, and the working tree is clean. Nothing has been pushed.
+
+  When you're ready to publish the branch:
+
+  git push -u origin feat/frontend
+
+  The AI log keeps changing as we talk, so commit it again just before you push.
+
+❯ At this point would running another code review on the project likely pick up
+  any additional issues?
+
+⏺ Probably yes, but expect mostly minor items. I'd run a narrow review rather
+  than another full one.
+
+  - The fix commit (34ce54e) is worth reviewing. It's new code, and the
+    stale-fetch and in-flight-write logic in useGameLibrary.ts is the most
+    subtle part of the frontend. New concurrency code is where a second pass
+    usually finds something, and nothing has reviewed it yet. Reviewing just
+    HEAD~2..HEAD (the fix commit plus the log commit) at high would be cheap and
+    focused.
+  - The rest of the frontend would mostly repeat itself. A second pass over the
+    same diff tends to find lower-severity issues: style, naming, and edge cases
+    already covered by tests. Reviews also vary between runs, so you'd get some
+    new items, but most wouldn't be worth the churn.
+  - The backend has had a full security and best-practices review (the
+    fix/hardening branch). It has 82 tests, and CI runs PHPStan level 8 and
+    PHPCS on it. Another pass there has low expected value unless you want a
+    final pre-submission sweep.
+
+  Next steps:
+  1. Run /code-review high on the fix commit only.
+  2. Then move to docs/submission. A fresh-clone docker-compose up check and the
+     README are more likely to catch real submission problems than another code
+     review, such as a missing setup step or an undocumented key requirement.
+
+❯ Run the code review on the fix commit only. I have some changes afterwards I
+  want to discuss.
+
+⏺ Skill(code-review)
+  ⎿  Done
+
+⏺ The review of the fix commit (34ce54e) found 9 issues. Nothing is changed yet;
+  here are the findings and what I'd do about each.
+
+  Worth fixing (real bugs, though they need unusual timing)
+
+  #: 1
+  Issue: A refresh dropped because a write is in flight is never replayed if
+  that
+    write then fails with a network or rate-limit error. The daily-limit banner
+    can stay wrong until a reload.
+  Proposed fix: Set a "refresh owed" flag when a fetch is dropped. Run that
+    refresh when the last in-flight write finishes, success or failure.
+  ────────────────────────────────────────
+  #: 4
+  Issue: Same root cause as #1, for the midnight timer: its refresh can be
+    dropped and never re-armed, leaving the user locked out until a reload.
+  Proposed fix: Fixed by #1.
+  ────────────────────────────────────────
+  #: 2
+  Issue: If an add during the initial load supersedes the load and then fails,
+    the page stays on the loading skeleton with no Try again.
+  Proposed fix: When a refresh fails while the status isn't ready, switch to the
+
+    error state so Try again appears.
+  ────────────────────────────────────────
+  #: 3
+  Issue: The tie-break still doesn't fully match the server. The server sorts
+    ties by upstream apiId, the client by local id, and they can differ for
+  games
+     imported from outside the app.
+  Proposed fix: Change the backend tie-break to local id, a one-line change in
+    GameService::list. The client and server then agree by definition. The
+    alternative is exposing apiId to the client.
+
+  Minor polish
+
+  #: 5
+  Issue: Pressing inside the dialog and releasing over the backdrop, for example
+
+    while selecting text, closes the dialog.
+  Proposed fix: Record where the pointer went down, and only cancel if both
+  press
+    and release were on the backdrop.
+  ────────────────────────────────────────
+  #: 6
+  Issue: The field error can be announced twice on click, and not at all when
+  you
+    press Enter twice with the same error.
+  Proposed fix: Take title-error out of the live region. Use a separate visually
+
+    hidden live region, and clear it before setting it so a repeated message is
+    announced again.
+  ────────────────────────────────────────
+  #: 9
+  Issue: Removing a game someone else already removed (NOT_FOUND) briefly puts
+    the row back before the resync removes it again.
+  Proposed fix: Skip the rollback on NOT_FOUND.
+
+  Code quality
+
+  ┌─────┬────────────────────────────────────────┬──────────────────────────┐
+  │  #  │                 Issue                  │       Proposed fix       │
+  ├─────┼────────────────────────────────────────┼──────────────────────────┤
+  │     │ The me rollback hard-codes the vote's  │ Revert exactly the       │
+  │ 7   │ two fields instead of undoing whatever │ fields the update        │
+  │     │  the update actually changed.          │ changed.                 │
+  ├─────┼────────────────────────────────────────┼──────────────────────────┤
+  │     │ add() duplicates the restoreGame logic │ Rename the helper to     │
+  │ 8   │  inline.                               │ upsertGame and use it in │
+  │     │                                        │  both places.            │
+  └─────┴────────────────────────────────────────┴──────────────────────────┘
+
+  My recommendation is to fix all 9. The changes are small and fit in one commit
+  with regression tests for #1, #2, #5 and #9. The decision for you is #3: do
+  you want the one-line backend change? It touches PHP, so the 82 backend tests
+  should be re-run.
+
+  What changes did you want to discuss? I can fold these fixes in with them, or
+  do them separately.
+❯ Yes fix all 9 then rerun the tests. Describe each fix so I can review. Wait
+  until I give the go ahead to stage and commit. Lets do those separately
+  because they are feature additions and styling updates.
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ I'll start with the hook, since it holds 6 of the 9 fixes. First I'm checking
+  which errors trigger a resync and what NOT_FOUND means on each endpoint:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && cat frontend/src/lib/messages.ts | sed -n
+      1,60p; grep -n "notFound\|NOT_FOUND" backend/src/Service/*.php
+      backend/src/Http/Routes.…)
+  ⎿  (No output)
+
+⏺ NOT_FOUND on an unvote can just mean "you haven't voted", so I'll limit the #9
+  change to remove. Writing the hook now:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/hooks/useGameLibrary.ts'…)
+  ⎿  No matches found
+
+⏺ Now the dialog (#5) and the add form (#6):
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/components/ConfirmDialog.tsx'…)
+  ⎿  (No output)
+
+⏺ Next, the backend tie-break (#3):
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='backend/src/Service/GameService.php'…)
+  ⎿  (No output)
+
+⏺ The backend change needs its own test. Checking how the existing list tests
+  are set up:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/backend && ls tests tests/Support; grep -n
+      "function test\|->list(" tests/GameServiceTest.php | head -30; grep -n
+      "public\|function"…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/backend && sed -n 110,135p
+      tests/GameServiceTest.php; sed -n 20,50p tests/Support/FakeEoa.php)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/backend && sed -n 11,25p
+      tests/GameServiceTest.php)
+  ⎿  (No output)
+
+⏺ Update(backend/tests/GameServiceTest.php)
+  ⎿  Added 14 lines
+      123          $this->assertSame(['Beta', 'Alpha', 'Gamma', 'Delta'],
+            $titles);
+      124      }
+      125  
+      126 +    public function testTiesFollowLocalIdEvenWhenUpstreamOrder
+          +Differs(): void                                               
+      127 +    {                                                         
+      128 +        $user = $this->makeUser();                            
+      129 +        // Created upstream first, but only imported (given a 
+          +local id) on the                                              
+      130 +        // next list, after our own add.                      
+      131 +        $this->eoa->seed('Outside');                          
+      132 +        $ours = $this->services->games()->add($user, 'Ours'); 
+      133 +                                                              
+      134 +        $games = $this->services->games()->list($user);       
+      135 +                                                              
+      136 +        $this->assertSame(['Ours', 'Outside'], array_column($g
+          +ames, 'title'));                                              
+      137 +        $this->assertLessThan($games[1]['id'], $ours['id']);  
+      138 +    }                                                         
+      139 +                                                              
+      140      public function testListImportsGamesAddedElsewhereAndDecod
+           esTheirNames(): void
+      141      {
+      142          $this->eoa->seed('Tom & Jerry <3');
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose --profile test run --rm
+      test composer check 2>&1 | tail -15)
+  ⎿  (No output)
+
+⏺ PHPCS flags two lines in HttpTest.php that I didn't touch, which suggests the
+  test container may be running a stale copy of the code. Checking how the test
+  service gets its source:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n '/^  test:/,/^  [a-z]*:$/p'
+      docker-compose.yml; awk 'length > 120 {print FILENAME": "FNR": "length}'
+      backend/tests/HttpTes…)
+  ⎿  (No output)
+
+⏺ No source mount, so run reused an old image built before the hardening branch.
+  Locally no line in HttpTest.php is over 120 characters. Rebuilding the test
+  image and re-running:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose --profile test build test
+      2>&1 | tail -1 && docker-compose --profile test run --rm test composer
+      check 2>&1 | tail…)
+  ⎿  (No output)
+  ⎿  (timeout 10m)
+
+⏺ The backend is green: PHPCS, PHPStan, and 83 PHPUnit tests (82 plus the new
+  one). Confirming the new test fails on the old sort:
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad; cp backen…)
+  ⎿  (No output)
+
+⏺ The new backend test fails on the old sort and passes on the new one. Now the
+  frontend regression tests:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/App.test.tsx'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ Prettier reformatted the test import, so my script stopped before editing
+  anything, and the lint rule objects to refresh() inside the mount effect. I'm
+  restructuring refresh into a state-free retry loop with promise callbacks
+  next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && head -12 src/App.test.tsx && git
+      diff --stat src/App.test.tsx && python3 - <<'EOF'
+      p='src/hooks/useGameLibrary.ts'…)
+  ⎿  No matches found
+⏺ Lint is clean. Now re-running the test edits with the import line fixed:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && sed -i '' "1s/.*/import {\n
+      act,\n  fireEvent,\n  render,\n  screen,\n  waitFor,\n  within,\n} from
+      '@testing-library\/…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/App.test.tsx'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ All 53 frontend tests pass and typecheck and lint are clean. Confirming the
+  new tests fail against the committed code:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/n…)
+  ⎿  (No output)
+
+⏺ The script failed safely: zsh doesn't split $F into words, so the first copy
+  failed and the checkout never ran. Your working files are unchanged. Retrying
+  with an explicit file list:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/n…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ All 6 new or changed regression tests fail on the committed code and pass with
+  the fixes. Last, I'm rebuilding the running stack so http://localhost:8080
+  reflects the changes when you review:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose up -d --build 2>&1 | tail
+      -3 && curl -s -o /dev/null -w "SPA %{http_code}\n" http://localhost:8080/
+      && curl -s htt…)
+  ⎿  (No output)
+
+⏺ I fixed all 9 findings and every check passes. Nothing is staged or committed.
+
+  - Frontend: 53 tests pass, up from 49, and typecheck and lint are clean.
+  - Backend: PHPCS, PHPStan and 83 PHPUnit tests pass, up from 82.
+  - New tests: the 6 new or changed frontend tests and the new backend test all
+    fail on the committed code and pass with the fixes.
+  - Running app: I rebuilt it, so http://localhost:8080 shows the fixed version.
+
+  One thing came up along the way: docker-compose --profile test run doesn't
+  rebuild the test image. My first backend run tested a stale image from before
+  the hardening branch. Adding --build to that command in the README and
+  CLAUDE.md would prevent this, and I'll include it in docs/submission.
+
+  The fixes, by file
+
+  frontend/src/hooks/useGameLibrary.ts
+
+  This file holds fixes #1, #2, #4, #7, #8 and #9.
+
+  - #1 and #4: dropped refreshes are now replayed.
+    - The single requestId is split into fetchId (orders fetches against each
+      other) and writeEpoch (bumped by each optimistic write).
+    - fetchAll now returns 'applied', 'superseded' (a newer fetch will decide)
+      or 'interrupted' (a write started meanwhile).
+    - An interrupted fetch sets refreshOwed. In runOptimistic's finally, the
+      last write to finish runs that owed refresh, even when it failed with a
+      network error. This also covers the midnight timer's refresh.
+  - #2: no endless loading screen.
+    - fetchInitial is gone. Initial load, Try again and the post-write re-syncs
+      all use refresh().
+    - refresh() calls settle(), which fetches until a result is applied or
+      another fetch or write takes over. It fetches again if a write finished
+      before the fetch resolved.
+    - On failure, refresh checks statusRef. If no list has loaded yet, it shows
+      the load error with Try again; otherwise it uses the page alert.
+    - The success and error handlers are promise callbacks rather than code
+      after await. That's the shape the lint rule accepts inside the mount
+      effect.
+  - #7: generic me rollback. The new revertFields(current, before, after) puts
+    back exactly the fields the me updater changed, instead of a hard-coded vote
+    field list.
+  - #8: shared helper. restoreGame is renamed upsertGame, and add() uses it
+    instead of an inline copy.
+  - #9: no flicker on NOT_FOUND. OptimisticChange has a new goneOnNotFound flag,
+    set only by remove. When a removal gets NOT_FOUND, the row is not put back.
+    I left vote and unvote alone because NOT_FOUND there can mean "you haven't
+    voted for this game."
+
+  frontend/src/components/ConfirmDialog.tsx (#5)
+
+  - onPointerDown and onPointerUp record whether each end of the press landed on
+    the backdrop.
+  - onClick cancels only when the target is the <dialog> and both the press and
+    the release were on the backdrop. The flags reset after every click.
+
+  frontend/src/components/AddGameForm.tsx (#6)
+
+  - aria-live is off #title-error, which stays in aria-describedby.
+  - The new showError() either moves focus to the input, so the screen reader
+    reads the error with the field, or, if the input already has focus (Enter),
+    speaks the error through a new visually hidden aria-live="assertive" region.
+  - Each message is rendered in a <span key={id}>, so a repeated error replaces
+    the node and is announced again.
+  - Typing clears it. The result is one announcement per submit on both paths.
+
+  backend/src/Service/GameService.php (#3)
+
+  - Ties now sort by local id instead of upstream apiId. The temporary apiId
+    field and the array_map that stripped it are gone.
+  - The docblock explains the order: the order games reached this app, which the
+    client can reproduce.
+
+  Tests
+
+  - backend/tests/GameServiceTest.php:
+    testTiesFollowLocalIdEvenWhenUpstreamOrderDiffers covers a game created
+    upstream first but imported after our own add.
+  - frontend/src/App.test.tsx:
+    - A refresh that replaced the first load fails, and the page shows Try again
+      rather than a stuck skeleton (#2).
+    - A refresh dropped during an unvote that later fails is replayed, and the
+      refunded action shows (#1).
+    - Pressing Enter twice announces the error twice through new nodes. The
+      click path adds nothing to the live region (#6).
+    - A drag from the panel to the backdrop keeps the dialog open (#5).
+    - A NOT_FOUND removal doesn't bring the row back (#9).
+    - New liveRegion() helper.
+
+  Let me know when to stage and commit. I'll keep this commit separate from the
+  feature and styling changes you want to discuss.
+
+❯ <ide_opened_file>The user opened the file /Users/tonyschappaugh/Websites/eoa-
+  challenge/backend/src/Service/GameService.php in the IDE. This may or may not
+  be related to the current task.</ide_opened_file>
+
+❯ stage and commit on local only
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add frontend backend && git commit -q
+      -F - <<'EOF'
+      fix: address second frontend review round…)
+  ⎿  (No output)
+
+⏺ I committed the second round of review fixes on feat/frontend as 0689f09, and
+  the AI session log is in its own commit, 09a19ad. The working tree is clean
+  and nothing has been pushed.
+
+  What changes do you want to discuss? You mentioned feature additions and
+  styling updates.
+
+❯ before I preceed I want to confirm that the game still is working. Can I just
+  open a new page in incognto and have the changes reflected in the browser?
+
+⏺ Yes. I rebuilt the stack after the last code changes, and committing didn't
+  change any code, so http://localhost:8080 is already serving the current
+  version. An incognito window also gives you a fresh identity (new uid cookie)
+  and an empty cache, so you'll see the latest frontend as a new user.
+
+  - Existing games: the library still has the games you added earlier. Your new
+    incognito identity won't own them, so you won't see Remove on them.
+  - Your daily action: the incognito user gets one add or vote today. To test
+    Remove, add a game in that window first.
+  - A second user: open another incognito window, or a normal one, to see how
+    two users interact.
+  - Your earlier window: if you've had a regular window open since before the
+    rebuild, refresh it so it loads the new code.
+
+  If anything looks off, tell me what you see and I'll check the containers.
+
+❯ I tried testing two users each in an incognito window. User 1 enters a game
+  "GTA" then User 2 immediately enters the same game "GTA" User 1 is
+  successful. User 2 gets an immediate "You've already used today's vote or
+  game suggestion. Come back after midnight." instead of "That game is already
+  on the list."
+
+⏺ I think the two windows were the same user. Checking a couple of code paths to
+  be sure:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rn "already used today" backend/src
+      frontend/src --include=*.php --include=*.ts --include=*.tsx | grep -v
+      test; grep -n "fu…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rn "already used today" backend/src
+      frontend/src | grep -v "\.test\.")
+  ⎿  (No output)
+
+⏺ The server checks the daily limit before duplicates, so User 2 was really User
+  1. Next I'll test two separate users with separate cookie jars and a
+  throwaway title to confirm the duplicate message. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad && H=(-H '…)
+  ⎿  (No output)
+
+⏺ The app behaves correctly with two real users. Removing the throwaway game and
+  the two test users:
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad && curl -s…)
+  ⎿  Error: Permission for this command was denied by a built-in Claude Code
+     safety check, not by the user. The check stops removals that can delete far
+     more than intended: a system, home or workspace directory, or a target it
+     cannot resolve, such as a shell variable that, if unset or empty, turns
+     this into `rm -rf /` or `rm -rf /*`. Only a person may approve such a
+     removal, and no person did (the permission prompt timed out, or none was
+     shown). The command was NOT run; do not claim it succeeded. Do not work
+     around the check by splitting, scripting, or re-issuing the removal through
+     another tool or shell: the check exists because a removal like this can
+     destroy the user's data, and getting past it would not make it safe. If the
+     text below suggests a safe rewrite, run that instead; it goes through the
+     same check. Otherwise finish the rest of the task without this removal,
+     tell the user what you wanted to delete and why, and leave the removal to
+     them. What was flagged: This command passes a shell -c script that runs rm,
+     and Claude Code could not check the script for dangerous removals. Approve
+     only if you have read the script.
+
+⏺ The safety check blocked the command because of the rm of the two cookie
+  files. Those files sit in my scratchpad and are harmless, so I'll leave them
+  and re-run the cleanup without the removal:
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad && curl -s…)
+  ⎿  No matches found
+⏺ The app is behaving correctly. Both of your incognito windows were the same
+  user, because Chrome shares one cookie jar across all incognito windows that
+  are open at the same time. Both windows sent the same uid cookie, so the
+  server saw User 1 adding a second game. The server checks the daily limit
+  before checking for duplicates, so it answered "You've already used today's…".
+
+  I checked with two truly separate identities (separate cookie jars, through
+  the real stack):
+
+  ┌────────────────────────┬────────────────────────────────────────────────┐
+  │        Request         │                     Result                     │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ User A adds "Dup Check │ added                                          │
+  │  Zz"                   │                                                │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ User B adds "dup check │ DUPLICATE_TITLE: "That game is already on the  │
+  │  zz"                   │ list."                                         │
+  ├────────────────────────┼────────────────────────────────────────────────┤
+  │ User A adds it again   │ DAILY_LIMIT_REACHED                            │
+  └────────────────────────┴────────────────────────────────────────────────┘
+
+  I removed the test game and the two test users afterward. The cleanup command
+  first included deleting my two scratch cookie files; a safety check blocked
+  that, so I left those files in my scratch folder, which is harmless.
+
+  Testing two users in one browser
+  - One incognito window plus one normal window.
+  - Two different browsers, such as Chrome and Safari.
+  - A Chrome Guest window (profile menu → Guest), which has its own cookies.
+
+  Two things from your test could be worth changing, and they may fit with the
+  feature changes you want to discuss:
+  1. Check duplicates before the limit. A user who has used today's action and
+     tries a title already on the list would see the more specific "already on
+     the list" message. It's a small reorder in GameService::add.
+  2. Refresh when a tab regains focus. Your second window didn't know the action
+     was already used, because each tab only refreshes after its own actions or
+     at midnight. Re-syncing on visibilitychange would keep other tabs current
+     and catch other users' changes.
+
+❯ Would option 2 be burdensome on the browser or the server?
+
+⏺ No, it would be light on both, because it fires on an event rather than on a
+  timer.
+
+  Browser: no real cost. A visibilitychange listener does nothing until the tab
+  becomes visible again. Then it runs the same quiet refresh the app already
+  runs after every action: two small JSON requests and a re-render of a short
+  list. There's no polling and no loading skeleton. The stale-fetch guards we
+  just added already stop a focus refresh from overwriting a vote that's in
+  flight.
+
+  Our server: about two lightweight GETs (/api/games and /api/me) each time a
+  user switches back to the tab. That's well inside the nginx limit of 10
+  requests a second per IP, and the reads are cheap MySQL queries.
+
+  EOA API: this is the one real cost. Every /api/games call makes an upstream
+  list request, since EOA is the system of record. Someone flipping between tabs
+  could send a burst of them. We don't know EOA's rate limits, so I'd add a
+  throttle and skip the refresh if the last successful sync was under about 30
+  seconds ago. That caps it at roughly two upstream calls a minute per active
+  user, at most, and usually far fewer.
+
+  The change would be one small effect in useGameLibrary.ts (listener, throttle,
+  cleanup), plus a couple of tests. I'd recommend it with the throttle. Want me
+  to include it with the other changes you have in mind?
+
+❯ let me describe the two changes I am contemplating to the structure of the
+  page and way that game names are compared. First, if there are many entries I
+  think it makes sense to make the list paginated. The pagination could give
+  options for how many to show per page. The other change is that many games
+  have possessive names a apostrophe that can be rendered with a single quote
+  or a curly quote. That give two games right now with a very difficult to
+  detect difference. There may be other similar characters in english such as a
+  hyphen and an en dash. Is there a simple way to detect those limited
+  characters and substitute a single example?
+
+⏺ Both are reasonable changes, and both are fairly contained.
+
+  1. Pagination
+
+  Approach: paginate in the browser. The EOA list endpoint returns every game in
+  one call, and we have to fetch them all to sort by votes anyway. Server-side
+  paging would save nothing, and for a list this size (dozens to a few hundred)
+  slicing it in the browser costs nothing.
+
+  What I'd build
+  - Page size: a labeled <select> with 10, 25, 50 and All. Default 10,
+    remembered in localStorage. Storing a display preference there doesn't
+    conflict with the "persistence in MySQL" rule, which covers votes and games.
+  - Ranks stay global: game #11 shows as 11 on page 2, not 1.
+  - Pagination control: a <nav aria-label="Pagination"> with Previous/Next and
+    page numbers. The current page gets aria-current="page", and a summary reads
+    "Showing 11–20 of 45".
+  - Focus: changing pages moves focus to the list heading, the same pattern as
+    removal.
+
+  Edge cases to settle
+  - A vote can move a game to another page. Your vote could push "Zelda" from
+    page 2 to page 1, so it vanishes from view. My suggestion is to stay on the
+    current page and rely on the existing "Voted for Zelda." announcement.
+    Jumping pages for the user would be more disorienting.
+  - Removing the last game on the last page: the page index is clamped so you
+    never land on an empty page.
+
+  Alternatives worth knowing about
+  - "Show more": a single button that appends 10 more games. It's simpler and
+    arguably more accessible, but there's no page-size choice.
+  - A filter/search box: "is X already on the list?" is a common question before
+    suggesting a game, and a filter answers it better than paging does. It
+    could be added later.
+
+  2. Look-alike punctuation
+
+  Yes, there's a simple way. Fold a short, explicit list of look-alike
+  characters into the comparison key only:
+
+  ┌─────────┬───────────────────────┐
+  │ Fold to │      Characters       │
+  ├─────────┼───────────────────────┤
+  │ '       │ ’ ‘ ‛ ʼ ′ ` ´         │
+  ├─────────┼───────────────────────┤
+  │ "       │ “ ” „ ‟ ″             │
+  ├─────────┼───────────────────────┤
+  │ -       │ ‐ ‑ ‒ – — ― − (minus) │
+  └─────────┴───────────────────────┘
+
+  How it fits the current code
+  - Two places to change: Title::normalize (PHP) and normalizeTitle (TS), each
+    getting the same map, with matching tests on both sides.
+  - Already handled: NFKC (Unicode compatibility normalization) already folds
+    full-width characters, … → ..., and non-breaking spaces. Only the characters
+    above need a hand-written map.
+  - Display isn't affected. We fold only the comparison key, so the title shows
+    exactly as the first person typed it. "Baldur’s Gate" keeps its curly
+    apostrophe, but "Baldur's Gate" is rejected as a duplicate.
+  - Why not the full Unicode confusables check: PHP's Spoofchecker (Unicode's
+    standard check for look-alike characters) exists, but it's built for
+    spoofing attacks and treats things like l/1 as matches. That's too
+    aggressive for game titles. A short explicit list is predictable and easy to
+    explain in the README.
+
+  Existing data: your local library already has both "Baldur’s Gate" (id 15) and
+  "Baldur's Gate" (id 16). If the normalized title column has a unique index,
+  existing keys need recomputing, and those two would collide. Before writing
+  anything I'd check the schema and either add a small re-key step or remove one
+  of the pair. A fresh clone starts empty, so this only matters for your local
+  data.
+
+  Suggested order
+
+  These are independent, so I'd make them separate commits, or separate branches
+  off feat/frontend if you'd like them reviewable on their own:
+  1. Punctuation folding first. It's small and touches both backend and
+     frontend.
+  2. Pagination.
+  3. The focus-refresh throttle from earlier, if you want it.
+
+  Do these designs match what you had in mind, particularly the pagination edge
+  cases?
+
+❯ Do you think either would be helpful with the scoring for the exercise?
+
+⏺ Of the two, the punctuation folding is likely to help your score. Pagination
+  probably won't.
+
+  Punctuation folding: yes, worth doing.
+  - It extends a stated requirement. Rejecting duplicate titles is in the brief,
+    and handling ’ vs ' and – vs - shows you thought past the obvious
+    case-insensitive check. Reviewers notice that kind of edge case.
+  - It's small and low-risk: one function on each side, with tests.
+  - It gives you a concrete README point, and you found it through hands-on
+    testing, which is a good story.
+
+  Pagination: probably neutral, possibly a slight negative.
+  - The brief doesn't ask for it, and an office game library won't have enough
+    entries to need it.
+  - Reviewers weigh judgment about scope. A clean, well-tested core often scores
+    better than extra features. Pagination also adds edge cases (votes moving
+    games between pages, focus, clamping) and more code to review.
+  - The safer move is a "Future improvements" line in the README: "Paginate or
+    filter the list if the library grows; the API returns the full list, so this
+    would be client-side." That shows you considered it without spending the
+    time or taking on the risk.
+
+  Focus refresh: a small plus. It fixes a real stale-data problem you hit while
+  testing, at low cost. It's optional, though.
+
+  What I expect will matter most for scoring is the remaining submission work:
+  the README (setup, design decisions, API quirks, trade-offs), a fresh-clone
+  docker-compose up check, and the clean transcript export. Those are required,
+  and reviewers will see them first.
+
+  My suggested order:
+  1. Punctuation folding.
+  2. The focus refresh, if you want it.
+  3. docs/submission, with pagination listed as a future improvement.
+
+❯ lets go with the punctuation and not the pagination. If I need to start over
+  with a new set of data. that is OK. Would we fold your last set of fixes into
+  these changes? Also, after this is completed, I will want to work on the
+  design of the page which we may want to make a new phase altogether.
+
+⏺ The fixes from both review rounds are already committed on feat/frontend, so
+  there's nothing to fold in. I'll make the punctuation change a separate commit
+  on that branch, since it's still local. Each commit then tells its own story:
+  feature, review fixes, re-review fixes, then this enhancement.
+
+  A design phase after this makes sense as its own branch (feat/design), started
+  from main once you've merged feat/frontend.
+
+  Starting on the punctuation work, with a look at the schema first:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 9,21p
+      backend/migrations/001_init.sql; grep -rn "normalize(" backend/src | grep
+      -v "function normalize"; grep -rn "normali…)
+  ⎿  No matches found
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 180,215p
+      backend/src/Service/GameService.php; grep -n "normalize\|Normalize"
+      backend/tests/TitleTest.php | head -20)
+  ⎿  (No output)
+
+⏺ The title_normalized column has a unique index, so I'll use a fresh DB, which
+  you've approved. The fold must run before NFKC because some characters change
+  under it, and I'm implementing in PHP first. · summary
+
+⏺ Update(backend/src/Domain/Title.php)
+  ⎿  Added 27 lines
+      12      public const MAX_LENGTH = 100;
+      13  
+      14      /**
+      15 +     * Punctuation that looks alike in titles ("Baldur’s Gate" 
+         +vs "Baldur's                                                   
+      16 +     * Gate"), folded to one ASCII form for duplicate detection
+         + only. Kept in                                                 
+      17 +     * sync with LOOKALIKES in frontend/src/lib/title.ts.      
+      18 +     */                                                        
+      19 +    private const LOOKALIKES = [                               
+      20 +        "\u{2018}" => "'", // left single quote                
+      21 +        "\u{2019}" => "'", // right single quote / curly apostr
+         +ophe                                                           
+      22 +        "\u{201B}" => "'", // single high-reversed-9 quote     
+      23 +        "\u{02BC}" => "'", // modifier letter apostrophe       
+      24 +        "\u{2032}" => "'", // prime                            
+      25 +        '`' => "'",                                            
+      26 +        "\u{00B4}" => "'", // acute accent                     
+      27 +        "\u{201C}" => '"', // left double quote                
+      28 +        "\u{201D}" => '"', // right double quote               
+      29 +        "\u{201E}" => '"', // double low-9 quote               
+      30 +        "\u{201F}" => '"', // double high-reversed-9 quote     
+      31 +        "\u{2033}" => '"', // double prime                     
+      32 +        "\u{2010}" => '-', // hyphen                           
+      33 +        "\u{2011}" => '-', // non-breaking hyphen              
+      34 +        "\u{2012}" => '-', // figure dash                      
+      35 +        "\u{2013}" => '-', // en dash                          
+      36 +        "\u{2014}" => '-', // em dash                          
+      37 +        "\u{2015}" => '-', // horizontal bar                   
+      38 +        "\u{2212}" => '-', // minus sign                       
+      39 +    ];                                                         
+      40 +                                                               
+      41 +    /**                                                        
+      42       * Canonical (NFC) form with control/format characters remo
+          ved and
+      43       * whitespace trimmed and collapsed. This is what we store 
+          and display.
+      44       */
+
+⏺ Update(backend/src/Domain/Title.php)
+  ⎿  Added 7 lines, removed 4 lines
+      60      }
+      61  
+      62      /**
+      63 -     * Key for duplicate detection: compatibility-normalized (N
+         -FKC, so                                                        
+      64 -     * full-width letters and ligatures match their plain forms
+         -) and                                                          
+      65 -     * case-folded (so "ß" matches "ss").                      
+      63 +     * Key for duplicate detection: look-alike quotes and dashe
+         +s folded to                                                    
+      64 +     * ASCII, compatibility-normalized (NFKC, so full-width let
+         +ters and                                                       
+      65 +     * ligatures match their plain forms) and case-folded (so "
+         +ß" matches                                                     
+      66 +     * "ss"). Folding runs first because NFKC would otherwise r
+         +ewrite some of                                                 
+      67 +     * these (a double prime becomes two primes).              
+      68       */
+      69      public static function normalize(string $raw): string
+      70      {
+      69 -        $nfkc = Normalizer::normalize(self::clean($raw), Normal
+         -izer::FORM_KC);                                                
+      71 +        $folded = strtr(self::clean($raw), self::LOOKALIKES);  
+      72 +        $nfkc = Normalizer::normalize($folded, Normalizer::FORM
+         +_KC);                                                          
+      73  
+      74          return mb_substr(mb_convert_case($nfkc === false ? '' :
+           $nfkc, MB_CASE_FOLD, 'UTF-8'), 0, self::MAX_LENGTH);
+      75      }
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(backend/tests/TitleTest.php)
+  ⎿  Added 21 lines
+      42      public function testNormalizeKeepsDifferentTitlesDistinct()
+          : void
+      43      {
+      44          $this->assertNotSame(Title::normalize('Zelda'), Title::
+          normalize('Zelda 2'));
+      45 +        // Folding only merges look-alikes; the punctuation its
+         +elf still counts.                                              
+      46 +        $this->assertNotSame(Title::normalize("Baldur's Gate"),
+         + Title::normalize('Baldurs Gate'));                            
+      47 +        $this->assertNotSame(Title::normalize('Half-Life'), Tit
+         +le::normalize('Half Life'));                                   
+      48      }
+      49  
+      50 +    public function testNormalizeFoldsLookAlikeQuotesAndDashes(
+         +): void                                                        
+      51 +    {                                                          
+      52 +        foreach (["\u{2019}", "\u{2018}", "\u{201B}", "\u{02BC}
+         +", "\u{2032}", '`', "\u{00B4}"] as $quote) {                   
+      53 +            $this->assertSame(Title::normalize("Baldur's Gate")
+         +, Title::normalize("Baldur{$quote}s Gate"), $quote);           
+      54 +        }                                                      
+      55 +        foreach (["\u{201C}", "\u{201D}", "\u{201E}", "\u{201F}
+         +", "\u{2033}"] as $quote) {                                    
+      56 +            $this->assertSame(Title::normalize('"Tag"'), Title:
+         +:normalize("{$quote}Tag{$quote}"), $quote);                    
+      57 +        }                                                      
+      58 +        foreach (["\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}
+         +", "\u{2014}", "\u{2015}", "\u{2212}"] as $dash) {             
+      59 +            $this->assertSame(Title::normalize('Half-Life'), Ti
+         +tle::normalize("Half{$dash}Life"), $dash);                     
+      60 +        }                                                      
+      61 +    }                                                          
+      62 +                                                               
+      63 +    public function testFoldingDoesNotChangeTheStoredTitle(): v
+         +oid                                                            
+      64 +    {                                                          
+      65 +        $this->assertSame("Baldur\u{2019}s Gate", Title::clean(
+         +"Baldur\u{2019}s Gate"));                                      
+      66 +    }                                                          
+      67 +                                                               
+      68      /** @return array<string, array{mixed}> */
+      69      public static function invalidTitles(): array
+      70      {
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(backend/tests/GameServiceTest.php)
+  ⎿  Added 11 lines
+      37          $this->assertSame(1, $this->eoa->countCalls('addGame'))
+          ;
+      38      }
+      39  
+      40 +    public function testDuplicatesIgnoreCurlyQuotesAndDashVaria
+         +nts(): void                                                    
+      41 +    {                                                          
+      42 +        $this->services->games()->add($this->makeUser(), "Baldu
+         +r\u{2019}s Gate \u{2013} Remastered");                         
+      43 +                                                               
+      44 +        $this->assertApiError(                                 
+      45 +            'DUPLICATE_TITLE',                                 
+      46 +            fn () => $this->services->games()->add($this->makeU
+         +ser(), "baldur's gate - remastered")                           
+      47 +        );                                                     
+      48 +        $this->assertSame("Baldur\u{2019}s Gate \u{2013} Remast
+         +ered", $this->services->games()->list(null)[0]['title']);      
+      49 +    }                                                          
+      50 +                                                               
+      51      public function testRejectedDuplicateDoesNotConsumeTheDaily
+          Action(): void
+      52      {
+      53          $this->services->games()->add($this->makeUser(), 'Zelda
+          ');
+
+⏺ Update(frontend/src/lib/title.ts)
+  ⎿  Added 19 lines, removed 1 line
+      10      .trim()
+      11  }
+      12  
+      13 +/**                                                            
+      14 + * Look-alike quotes and dashes, folded to one ASCII form for d
+         +uplicate                                                       
+      15 + * detection only. Kept in sync with Title::LOOKALIKES in the b
+         +ackend.                                                        
+      16 + */                                                            
+      17 +const LOOKALIKES: readonly [RegExp, string][] = [              
+      18 +  [/[‘’‛ʼ′`´]/gu, "'"],                                        
+      19 +  [/[“”„‟″]/gu, '"'],                                          
+      20 +  [/[‐-―−]/gu, '-'],                                           
+      21 +]                                                              
+      22 +                                                               
+      23 +/**                                                            
+      24 + * Mirrors the backend's duplicate key. Folding runs before NFK
+         +C, which                                                       
+      25 + * would otherwise rewrite some of these (a double prime become
+         +s two primes).                                                 
+      26 + */                                                            
+      27  export function normalizeTitle(raw: string): string {
+      14 -  return cleanTitle(raw).normalize('NFKC').toLowerCase()       
+      28 +  const folded = LOOKALIKES.reduce(                            
+      29 +    (text, [pattern, plain]) => text.replace(pattern, plain),  
+      30 +    cleanTitle(raw)                                            
+      31 +  )                                                            
+      32 +  return folded.normalize('NFKC').toLowerCase()                
+      33  }
+      34  
+      35  /** Returns an error message, or null when the title looks acce
+          ptable. */
+
+⏺ Update(frontend/src/lib/title.test.ts)
+  ⎿  Added 9 lines
+      23      expect(validateTitle('Pokémon', ['Pokémon'])).toMatch(/alre
+          ady/)
+      24      expect(validateTitle('Zelda 2', ['Zelda'])).toBeNull()
+      25    })
+      26 +                                                               
+      27 +  it('treats curly quotes and dash variants as duplicates', () 
+         +=> {                                                           
+      28 +    expect(validateTitle("Baldur's Gate", ['Baldur’s Gate'])).t
+         +oMatch(                                                        
+      29 +      /already/                                                
+      30 +    )                                                          
+      31 +    expect(validateTitle('“Tag”', ['"Tag"'])).toMatch(/already/
+         +)                                                              
+      32 +    expect(validateTitle('Half–Life', ['Half-Life'])).toMatch(/
+         +already/)                                                      
+      33 +    expect(validateTitle('Baldurs Gate', ["Baldur's Gate"])).to
+         +BeNull()                                                       
+      34 +  })                                                           
+      35  })
+      36  
+      37  describe('cleanTitle', () => {
+
+⏺ Update(frontend/src/lib/title.test.ts)
+  ⎿  Added 16 lines
+      43    it('normalizes full-width letters when comparing', () => {
+      44      expect(normalizeTitle('Ｚｅｌｄａ')).toBe('zelda')
+      45    })
+      46 +                                                               
+      47 +  it('folds every look-alike quote and dash the backend folds',
+         + () => {                                                       
+      48 +    for (const quote of ['’', '‘', '‛', 'ʼ', '′', '`', '´']) { 
+      49 +      expect(normalizeTitle(`Baldur${quote}s`)).toBe("baldur's"
+         +)                                                              
+      50 +    }                                                          
+      51 +    for (const quote of ['“', '”', '„', '‟', '″']) {           
+      52 +      expect(normalizeTitle(`${quote}Tag${quote}`)).toBe('"tag"
+         +')                                                             
+      53 +    }                                                          
+      54 +    for (const dash of ['‐', '‑', '‒', '–', '—', '―', '−']) {  
+      55 +      expect(normalizeTitle(`Half${dash}Life`)).toBe('half-life
+         +')                                                             
+      56 +    }                                                          
+      57 +  })                                                           
+      58 +                                                               
+      59 +  it('keeps the typed punctuation in the cleaned title', () => 
+         +{                                                              
+      60 +    expect(cleanTitle('Baldur’s Gate')).toBe('Baldur’s Gate')  
+      61 +  })                                                           
+      62  })
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -i '' 's/^-- title_normalized is
+      trimmed, whitespace-collapsed, and lowercased in PHP;$/-- title_normalized
+      is the duplicate…)
+  ⎿  (No output)
+  ⎿  (timeout 10m)
+
+⏺ Both test suites pass (56 frontend, 86 backend), with PHPCS and PHPStan clean.
+  I'm tidying the schema comment next, then resetting the data as you approved.
+  · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -i '' 's/^-- and dashes folded, NFKC,
+      case-folded);$/-- and dashes folded, NFKC, case-folded). The binary
+      collation makes the…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a &&
+      BASE=${EOA_API_BASE_URL:-https://codechallenge.essensedesigns.info} &&
+      curl -s -X POST "$BASE/cac…)  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The library is empty and the stack is rebuilt. Now an end-to-end check against
+  the real EOA API, with two separate users:
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad && H=(-H '…)
+  ⎿  (No output)
+
+⏺ Punctuation folding is done, and the data reset you approved is done too.
+  Nothing is staged or committed yet.
+
+  - Checks: 56 frontend tests and 86 backend tests pass; PHPCS, PHPStan,
+    typecheck and lint are clean.
+  - Live check against the real EOA API: "Baldur’s Gate – Remastered" was added
+    with its curly apostrophe and en dash kept. A second user's "baldur's gate -
+    remastered" got "That game is already on the list."
+
+  About your earlier question: the fixes from both review rounds were already
+  committed on feat/frontend, so there was nothing to fold in. This will be its
+  own commit on that branch.
+
+  Changes
+
+  backend/src/Domain/Title.php
+
+  - New LOOKALIKES map: each look-alike character → its ASCII form, with a
+    comment naming each one:
+    - ’ ‘ ‛ ʼ ′ ` ´ → '
+    - “ ” „ ‟ ″ → "
+    - ‐ ‑ ‒ – — ― − → -
+  - normalize() applies it with strtr before NFKC and case folding. The order
+    matters because NFKC rewrites some of these characters first: ″ becomes two
+    primes, and ´ becomes a space plus an accent.
+  - clean() is unchanged, so the stored and displayed title keeps whatever
+    punctuation the first person typed. Only the duplicate key is folded.
+
+  frontend/src/lib/title.ts
+
+  - The same folding is in normalizeTitle(), as three character-class patterns
+    that match the PHP map. Comments on both sides point to each other so the
+    two lists stay in sync.
+
+  backend/migrations/001_init.sql
+
+  - Only the comment changed. It was out of date before this change, and now
+    describes the actual key. The schema itself is unchanged.
+
+  Tests
+
+  - backend/tests/TitleTest.php:
+    - Every character in the map folds.
+    - Baldur's ≠ Baldurs and Half-Life ≠ Half Life, so folding merges
+      look-alikes without dropping punctuation.
+    - clean() keeps the curly apostrophe.
+  - backend/tests/GameServiceTest.php: adding "baldur's gate - remastered" after
+    "Baldur’s Gate – Remastered" returns DUPLICATE_TITLE, and the original
+    title is kept.
+  - frontend/src/lib/title.test.ts: the same character coverage, the duplicate
+    check in validateTitle, and a test that cleanTitle keeps the typed
+    punctuation.
+
+  Data reset
+
+  - I flushed the EOA library and recreated the local database (docker-compose
+    down -v), then rebuilt the stack.
+  - I removed the test game and test users afterward, so http://localhost:8080
+    is now an empty library.
+  - Your current EOA key is still in .env.
+
+  Next
+
+  - Say the word and I'll commit this on feat/frontend (local only).
+  - The design phase can then start on a new feat/design branch from main once
+    you've merged feat/frontend.
+
+❯ OK since we are done with the code reviews for now I am switching back to
+  Sonnet before proceeding
+
+⏺ Sounds good. The punctuation-folding changes are still unstaged and
+  uncommitted. Once you're on Sonnet, say the word and I'll commit them locally
+  on feat/frontend.
+
+❯ /model sonnet
+  ⎿  Set model to claude-sonnet-5-5
+
+❯ before making the commit, i would like to test. can you provide me with a
+  list of the characters that trigger the change
+
+⏺ These are the characters that count as the same in the duplicate check. The
+  stack is already rebuilt with this change, so you can test now.
+
+  Apostrophes (all match ')
+
+  ┌──────┬────────────────────────────────────────────┬─────────────────────┐
+  │ Char │                    Name                    │      Mac keys       │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ’    │ right single quote (the usual curly        │ Option+Shift+]      │
+  │      │ apostrophe)                                │                     │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ‘    │ left single quote                          │ Option+]            │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ `    │ backtick                                   │ the key left of 1   │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ´    │ acute accent                               │ Option+E, then      │
+  │      │                                            │ Space               │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ‛    │ single high-reversed-9 quote               │ paste               │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ʼ    │ modifier letter apostrophe                 │ paste               │
+  ├──────┼────────────────────────────────────────────┼─────────────────────┤
+  │ ′    │ prime                                      │ paste               │
+  └──────┴────────────────────────────────────────────┴─────────────────────┘
+
+  Double quotes (all match ")
+
+  ┌──────┬──────────────────────────────┬────────────────┐
+  │ Char │             Name             │    Mac keys    │
+  ├──────┼──────────────────────────────┼────────────────┤
+  │ “    │ left double quote            │ Option+[       │
+  ├──────┼──────────────────────────────┼────────────────┤
+  │ ”    │ right double quote           │ Option+Shift+[ │
+  ├──────┼──────────────────────────────┼────────────────┤
+  │ „    │ double low-9 quote           │ Option+Shift+W │
+  ├──────┼──────────────────────────────┼────────────────┤
+  │ ‟    │ double high-reversed-9 quote │ paste          │
+  ├──────┼──────────────────────────────┼────────────────┤
+  │ ″    │ double prime                 │ paste          │
+  └──────┴──────────────────────────────┴────────────────┘
+
+  Dashes (all match -, the hyphen-minus)
+
+  ┌──────┬─────────────────────┬────────────────┐
+  │ Char │        Name         │    Mac keys    │
+  ├──────┼─────────────────────┼────────────────┤
+  │ –    │ en dash             │ Option+-       │
+  ├──────┼─────────────────────┼────────────────┤
+  │ —    │ em dash             │ Option+Shift+- │
+  ├──────┼─────────────────────┼────────────────┤
+  │ ‐    │ hyphen (U+2010)     │ paste          │
+  ├──────┼─────────────────────┼────────────────┤
+  │ ‑    │ non-breaking hyphen │ paste          │
+  ├──────┼─────────────────────┼────────────────┤
+  │ ‒    │ figure dash         │ paste          │
+  ├──────┼─────────────────────┼────────────────┤
+  │ ―    │ horizontal bar      │ paste          │
+  ├──────┼─────────────────────┼────────────────┤
+  │ −    │ minus sign          │ paste          │
+  └──────┴─────────────────────┴────────────────┘
+
+  For the "paste" ones, copy the character from the table. They look nearly
+  identical to the ones above them.
+
+  What to try
+
+  1. User 1 adds Baldur’s Gate. It should be added and display with the curly
+     apostrophe.
+  2. User 2 then tries each of these. All should get "That game is already on
+     the list.":
+     - Baldur's Gate (straight)
+     - baldur‘s gate (left curly, lowercase)
+     - Baldur´s Gate (acute accent)
+  3. Repeat with Half-Life, then Half–Life and Half—Life as User 2.
+  4. Should NOT be rejected:
+     - Baldurs Gate
+     - Half Life (space instead of a hyphen)
+
+  Remember that User 2 needs a separate cookie jar. Use one incognito window and
+  one normal window, or a different browser. Also, User 2's own duplicate check
+  happens in the browser first, so the "already on the list" message appears
+  instantly.
+
+  Tell me what you see. If everything behaves as expected, I'll commit.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/src/lib/title.ts in the
+  IDE. This may or may not be related to the current task.</ide_opened_file>
+
+❯ This is working as expected. Should this be mentioned in the plan since it is
+  an additional step for the title compairison?
+
+⏺ Yes, it belongs in PLAN.md, because it changes a stated decision. I'll look at
+  where the plan describes duplicate detection:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -n -i
+      "duplicate\|normaliz\|NFKC\|case-fold\|case-insens" PLAN.md CLAUDE.md)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 100,112p PLAN.md; sed -n 218,232p
+      PLAN.md; sed -n 160,168p PLAN.md)
+  ⎿  (No output)
+
+⏺ The plan's "Duplicate titles" section is stale. It still says "trim, collapse,
+  lowercase", which predates the hardening work as well. I'll update it to the
+  real rule.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='PLAN.md'…)
+  ⎿  (No output)
+
+⏺ Line 24 restates the brief's requirement, so I'm leaving it as is. I'll add
+  one line to CLAUDE.md's key decisions so future sessions know about the
+  folding:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='CLAUDE.md'…)
+  ⎿  (No output)
+
+⏺ Yes, and I've updated the docs. Nothing is staged or committed yet.
+
+  PLAN.md, "Duplicate titles" section. The old text said "trim, collapse inner
+  whitespace, lowercase", which was out of date. It now describes the real rule:
+  - Stored and shown title: cleaned (NFC, invisible characters removed,
+    whitespace collapsed) with the first person's punctuation kept as typed.
+  - Comparison key: look-alike quotes and dashes folded to ASCII first, then
+    NFKC, then case-folded.
+  - The three groups of folded characters are listed.
+  - Two examples show what matches (Baldur’s Gate = baldur´s gate, Half–Life =
+    Half-Life) and what doesn't (Baldurs Gate, Half Life).
+  - Why folding runs before NFKC: NFKC would rewrite some of these characters
+    itself.
+  - Why the full Unicode confusables check was rejected: it's too aggressive for
+    game titles.
+
+  I left the line 24 requirement alone, since it restates the brief's wording.
+
+  CLAUDE.md, key decisions. One new bullet notes that the map lives in two
+  places, Title::LOOKALIKES and LOOKALIKES in frontend/src/lib/title.ts, and
+  both must change together.
+
+  I'll commit everything together as feat: fold look-alike quotes and dashes in
+  duplicate detection and add the AI log in a separate commit, the same as
+  before. Say go and I'll stage and commit, local only.
+
+❯ ok run that stage and  commit to local
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add backend frontend PLAN.md CLAUDE.md
+      && git commit -q -F - <<'EOF'
+      feat: fold look-alike quotes and dashes in duplicate det…)
+  ⎿  (No output)
+
+⏺ I committed the punctuation folding on feat/frontend as 7976b37. The AI
+  session log is in its own commit, 5425c15. The working tree is clean and
+  nothing has been pushed.
+
+  feat/frontend now has these commits on top of main:
+  - 85e4460 feat: frontend
+  - 34ce54e fix: first review round
+  - 0689f09 fix: second review round
+  - 7976b37 feat: punctuation folding
+  - plus the AI log commits between them
+
+  Whenever you're ready to publish and merge, here are the commands (your push,
+  your merge):
+
+  cd ~/Websites/eoa-challenge
+  git add ai-logs && git commit -m "chore: update AI session log"   # if the log
+  changed again
+  git push -u origin feat/frontend
+  # check CI on GitHub, then:
+  git checkout main
+  git merge --no-ff feat/frontend
+  git push
+
+  After the merge we can start feat/design or docs/submission, whichever you
+  want first. Since design might change the UI, I'd do the README after the
+  design phase.
+
+❯ it looks like there are still some staged changes that were not commited
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git status && git diff --cached --stat |
+      tail -5)
+  ⎿  (No output)
+
+⏺ Your main is partway through the feat/frontend merge, with all conflicts fixed
+  but no final commit yet. I'm checking the staged result for leftover conflict
+  markers before concluding it. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git diff --cached --name-only
+      --diff-filter=U; git grep -n --cached -E '^(<<<<<<<|=======$|>>>>>>>)' --
+      . ':!*.lock' ':!package-l…)
+  ⎿  (No output)
+⏺ The merge result is clean. There are no conflict markers and no unresolved
+  files. The merge message is already prepared as "Merge branch
+  'feat/frontend'", which matches the tip of feat/frontend.
+
+  Conclude the merge with:
+
+  cd ~/Websites/eoa-challenge
+  git commit --no-edit
+
+  The status also shows one unstaged change,
+  ai-logs/session-2026-11-11-16730bd4.md. That's the live session log, which
+  keeps growing as we talk, and it isn't part of the merge. Commit it afterward,
+  then push:
+
+  git add ai-logs && git commit -m "chore: update AI session log"
+  git push
+
+  Once that's done, main has everything from feat/frontend and you can start the
+  next phase. I haven't touched the merge, since you run merges and pushes
+  yourself.
+
+❯ in VS Code in the terminal I see this:
+  On branch main
+  Your branch is up to date with 'origin/main'.
+
+  All conflicts fixed but you are still merging.
+    (use "git commit" to conclude merge)
+
+  Changes to be committed:
+          modified:   CLAUDE.md
+          modified:   PLAN.md
+          modified:   ai-logs/session-2026-11-11-16730bd4.md
+          modified:   backend/migrations/001_init.sql
+          modified:   backend/src/Domain/Title.php
+          modified:   backend/src/Service/GameService.php
+          modified:   backend/tests/GameServiceTest.php
+          modified:   backend/tests/TitleTest.php
+          modified:   frontend/package-lock.json
+          modified:   frontend/package.json
+          modified:   frontend/src/App.test.tsx
+          modified:   frontend/src/App.tsx
+          new file:   frontend/src/components/AddGameForm.tsx
+          new file:   frontend/src/components/ConfirmDialog.tsx
+          new file:   frontend/src/components/ErrorAlert.tsx
+          new file:   frontend/src/components/GameItem.tsx
+          new file:   frontend/src/components/GameList.tsx
+          new file:   frontend/src/components/LimitBanner.tsx
+          new file:   frontend/src/components/StatusRegion.tsx
+          new file:   frontend/src/components/styles.ts
+          new file:   frontend/src/hooks/useGameLibrary.ts
+          new file:   frontend/src/hooks/useNow.ts
+          modified:   frontend/src/index.css
+          new file:   frontend/src/lib/api.test.ts
+          new file:   frontend/src/lib/api.ts
+          new file:   frontend/src/lib/messages.ts
+          new file:   frontend/src/lib/time.test.ts
+          new file:   frontend/src/lib/time.ts
+          new file:   frontend/src/lib/title.test.ts
+          new file:   frontend/src/lib/title.ts
+          new file:   frontend/src/lib/types.ts
+          modified:   frontend/src/test-setup.ts
+          new file:   frontend/src/test/fakeServer.ts
+
+⏺ That's the same state I just looked at, and it's expected. Your merge of
+  feat/frontend into main is staged and waiting for you to finish it. Nothing is
+  wrong or missing.
+
+  Run this in that terminal:
+
+  git commit --no-edit
+
+  --no-edit accepts the prepared message "Merge branch 'feat/frontend'", so no
+  editor opens. To confirm it worked, run:
+
+  git log --oneline -3
+  git status
+
+  You should see the merge commit on top, and main one commit ahead of
+  origin/main. The only remaining change should be the unstaged ai-logs file.
+  Then push:
+
+  git add ai-logs && git commit -m "chore: update AI session log"
+  git push
+
+  If git commit --no-edit reports an error, paste it here and I'll take a look.
+
+❯ what are the remaining steps?
+
+⏺ Remaining steps
+
+  1. Finish the merge (you)
+  - git commit --no-edit, commit the AI log, then git push.
+  - Check that all five CI jobs go green on main in the Actions tab.
+
+  2. Design phase, feat/design (optional, your call)
+  - You mentioned wanting to work on the page design. It's a new branch from
+    main.
+  - Tests, axe and the real-Chrome checks need re-running afterward, since
+    design changes can break contrast, focus and mobile layout. It's worth
+    keeping that in the scope.
+
+  3. Small optional extras
+  - Focus refresh: re-sync when a tab becomes visible again, with a throttle of
+    about 30 seconds. It fixes the stale second-tab problem you hit.
+  - Duplicate check before the daily-limit check: a user who has used today's
+    action and enters an existing title would see "already on the list". This
+    one is a judgment call, so I'd leave it.
+  - .gitattributes with ai-logs/*.md merge=union: this would avoid log conflicts
+    on merges like the one you just did. I'd add it.
+
+  4. docs/submission (required)
+  - README:
+    - how to run it, the API key setup and expiry (including the INVALID_KEY
+      fix), and scripts/setup-hooks.sh
+    - the test commands, with --build on the test run so it doesn't use a stale
+      image
+    - the design decisions, the EOA API quirks, and the trade-offs and
+      limitations
+    - future improvements such as pagination and filtering
+  - Final accessibility pass.
+  - Fresh-clone check: clone the repo into a new folder and run docker-compose
+    up. This checks that a reviewer's first run works, including the missing-key
+    message and the migrations.
+  - Update CLAUDE.md status to done.
+
+  5. Submission artifacts (last, because the transcript has to be complete)
+  - Run /export at the very end, then scripts/scrub-transcript.sh, and check the
+    output for the key.
+  - Confirm that ai-logs/ is complete and has no key (the CI gitleaks job covers
+    history).
+  - Final push, and check that the public repo shows everything.
+
+  I'd do the README after any design work. If you'd rather not redesign,
+  docs/submission can start straight away.
+
+❯ Before we start on the design I have though of a new feature. When there are
+  more than 10 game entries to vote on, two buttons woul appear at the top and
+  bottom of the list. The left button would sort the list by rank, the right
+  button would sort the list alphabetically. Both buttons would toggle to show
+  the direction of the sort. Since we pull all of the list on every refresh,
+  how difficult would it be to implement this. Are there any issues or problems
+  that this might cause?
+
+⏺ It's easy to build. Sorting happens in the browser on data we already have, so
+  it needs no backend change, no extra requests, and no new refresh behavior.
+  I'd estimate one small component, a bit of state, and a handful of tests.
+
+  How it would work
+
+  - Keep the list in votes order as it is now, and derive the displayed order
+    from it. The hook's optimistic updates, rollbacks and refreshes don't
+    change.
+  - Sort state lives in the UI. A refresh replaces the data but not the sort, so
+    your chosen sort survives re-syncs.
+  - Alphabetical uses Intl.Collator with numeric ordering. "Zelda 2" comes
+    before "Zelda 10" and accented letters sort sensibly. Ties fall back to id.
+
+  Issues to decide
+
+  1. What the rank number shows when sorted A–Z.
+     - If it shows the list position, the numbers mean nothing.
+     - If it shows the true vote rank, the numbers appear out of order, but the
+       number still means something.
+     - I'd keep the true rank. The heading changes to match ("Games, A to Z"),
+       which helps clarify why the numbers jump around.
+  2. Direction semantics.
+     - Rank's default is most votes first.
+     - Clicking the inactive button activates it in its default direction (rank:
+       most votes first; A–Z). Clicking the active one reverses it.
+     - Each button's arrow and accessible name must state the current direction.
+  3. The controls appearing and disappearing at the 10-game threshold.
+     - If the list drops to 10 while sorted A–Z, the buttons vanish, and the
+       user is left on a sort they can't see or undo.
+     - My fix is to use the default order whenever the controls are hidden, so
+       crossing the threshold has no hidden state.
+     - Removing a game already moves focus to the list heading, so a vanishing
+       button won't strand focus.
+  4. Accessibility (the largest part of the work):
+     - Toggle semantics: these are toggle buttons with names like "Sort by rank,
+       most votes first" and "Sort alphabetically, A to Z", so the arrow isn't
+       the only signal. aria-pressed marks the active one.
+     - Announcement: each change is announced through the existing polite live
+       region ("Sorted A to Z").
+     - Two sets of controls: both sets are labeled as groups and stay in sync. A
+       click on the bottom set re-sorts the list without moving the page, which
+       can be disorienting, so I'd keep focus on the button and not scroll.
+     - Touch targets and mobile: 44px targets, and both buttons fit at 390px
+       width.
+  5. Voting while sorted by rank. The row moves when you vote, as it does today.
+     In A–Z mode it stays put, which is arguably nicer. The "Voted for X."
+     announcement covers both.
+  6. Persisting the choice. I'd leave it unpersisted: a reload resets to rank
+     order. Remembering it in localStorage is easy later if you want it.
+
+  Is it worth it for the exercise?
+
+  This is cheaper and lower-risk than pagination, because it has no
+  page-boundary problems and doesn't change what's on screen. It's still an
+  unrequested feature, so the same judgment applies. Its practical benefit is
+  that A–Z order helps answer "is my game already on the list?" before
+  suggesting a duplicate. It pairs well with the duplicate checking you've
+  already done.
+
+  I'd do it before the design phase, so the controls are part of what gets
+  designed rather than bolted on afterward. It should be its own commit with its
+  own tests.
+
+  Before I start, three quick questions:
+  1. Is the 10-game threshold fixed, or should it be a constant we can change
+     easily? I'd make it a named constant.
+  2. Is the default order (most votes first, A–Z) right for each button's first
+     click?
+  3. Are you okay with the rank number staying as the true vote rank in A–Z
+     mode?
+
+❯ If the buttons are always present would that solve the issues with list close
+  to 10 votes.
+
+⏺ Yes, that removes the problem. The only thing hiding the controls was the
+  threshold, and without it there's no hidden sort state and nothing appearing
+  or disappearing as the list crosses 10.
+
+  Two small things remain:
+
+  - Lists of 0 or 1 games. Sorting nothing is pointless, so I'd hide the
+    controls below 2 games, or show them disabled. That's safe: with 0 or 1
+    rows, no sort order is visible, so nothing can be stuck. When a second game
+    arrives, the controls reappear showing the active sort.
+  - The bottom set. On a short list, the second set of buttons is clutter.
+    Because the top set always shows the current state, the bottom set holds no
+    state, so it can safely stay conditional. I'd show the top set whenever
+    there are 2 or more games, and the bottom set only above 10, where scrolling
+    makes it useful. Nothing breaks when it appears or disappears, since focus
+    and sort state both live in the top set.
+
+  That keeps your original idea, with the threshold affecting only the
+  convenience copy at the bottom. The rest of the design stays the same,
+  including the rank numbers, the accessible names and the announcements.
+
+  If you agree, answer my earlier questions, mainly the default directions and
+  whether the rank stays as true vote rank in A–Z mode, and I'll build it. It
+  would be its own commit on feat/frontend, or on a new branch if you've already
+  merged to main.
+
+❯ lets go with greyed out buttons on the top on 0 or 1 games and show the
+  bottom buttons above 10. What other questions are relevant to decide before
+  we start.
+
+⏺ Most of the remaining decisions have a clear default. Here they are with my
+  recommendation for each, so you can answer "defaults" or change any of them.
+
+  Behavior
+  1. Button directions.
+     - Rank's default is most votes first. Clicking it again flips to fewest
+       votes first.
+     - A–Z's default is A to Z. Clicking it again flips to Z to A.
+     - Clicking the inactive button activates it in its default direction, and
+       clicking the active one reverses it.
+     - Recommend: yes.
+  2. Rank numbers in A–Z mode. They keep showing the true vote rank, as we
+     discussed. Recommend: yes.
+  3. Persistence. The sort resets to rank order on reload. Recommend: no
+     storage, since it's simpler and nothing can go stale.
+  4. Heading text. It follows the sort: "Games, most votes first", "Games,
+     fewest votes first", "Games, A to Z", "Games, Z to A". Recommend: yes.
+
+  Presentation
+  5. Button labels.
+  - Visible text is "Rank" and "A–Z" with an arrow icon showing direction. The
+    inactive button shows no arrow.
+  - Accessible names spell it out: "Sort by rank, most votes first" and "Sort
+    alphabetically, A to Z".
+  - Recommend: yes. Your original idea showed the direction, and this keeps it
+    readable at 390px.
+  6. Layout.
+     - The two buttons sit on one row under the heading, left button Rank and
+       right button A–Z, as you described, spread to opposite edges on wide
+       screens.
+     - The bottom copy mirrors the top.
+     - Recommend: yes. I'd keep the styling plain and reuse the existing button
+       styles, since the design phase will restyle them.
+  7. Greyed-out state.
+     - With 0 or 1 games, the buttons use the existing aria-disabled pattern
+       from the limit state: greyed out, still focusable, and clicking does
+       nothing.
+     - Recommend: yes, for consistency with the vote buttons.
+
+  Process
+  8. Branch. If the merge is done and main is pushed, I'd create feat/sort from
+  main rather than keeping on feat/frontend. That's the cleaner history, and you
+  can review and merge it separately. Confirm the merge is finished first.
+  9. Scope of tests. I'd cover:
+  - both sort directions and the tie-break
+  - the numeric-aware A–Z ordering
+  - the greyed-out state at 0 and 1 games
+  - the bottom set appearing above 10 games
+  - the announcements
+  - axe with the controls shown
+  - a real-Chrome check at 390px for button fit and contrast
+
+     Recommend: yes.
+
+  Answer "defaults" if all of that works, or give me the numbers you'd change.
+  Question 8 is the one I need an answer on before starting: has main been
+  pushed with feat/frontend merged?
+
+❯ Yes to defaults. Please create the feat/sort branch and proceed
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git status --short | head; git branch
+      --show-current; git log --oneline -3; git fetch -q origin 2>&1 | tail -1;
+      git status -sb |…)
+  ⎿  (No output)
+
+⏺ The merge is done and main is in sync with origin/main. Creating the branch
+  now. The live AI log is the only uncommitted change, and it carries over.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git checkout -q -b feat/sort && git branch
+      --show-current; cd frontend && cat src/App.tsx; cat
+      src/components/StatusRegion.tsx; c…)
+  ⎿  (No output)
+
+⏺ The branch is ready, and I'm leaving the existing hook alone so the new sort
+  can be built on top of it in the UI. I'll export announce so sort changes can
+  use the same live region, then write the pure sort logic. · summary
+
+⏺ Write(frontend/src/lib/sort.ts)
+  ⎿  Wrote 54 lines to frontend/src/lib/sort.ts
+       1 import type { Game } from './types'
+       2
+       3 export type SortKey = 'rank' | 'name'
+       4
+       5 export interface Sort {
+       6   by: SortKey
+       7   reversed: boolean
+       8 }
+       9
+      10 /** Most votes first: the order the server (and the hook) keep t
+     … +45 lines (~2 KB) (ctrl+o to expand)
+
+⏺ Write(frontend/src/components/SortControls.tsx)
+  ⎿  Wrote 76 lines to frontend/src/components/SortControls.tsx
+       1 import { directionText } from '../lib/sort'
+       2 import type { Sort, SortKey } from '../lib/sort'
+       3 import { secondaryButton, toggleOnButton } from './styles'
+       4
+       5 interface Props {
+       6   sort: Sort
+       7   /** Names the group, so the two copies of the controls can be
+         told apart. */
+       8   label: string
+       9   disabled: boolean
+     … +67 lines (ctrl+o to expand)
+
+⏺ Update(frontend/src/hooks/useGameLibrary.ts)
+  ⎿  Added 1 line
+      359      notice,
+      360      pendingIds,
+      361      adding,
+      362 +    announce,                                                 
+      363      load,
+      364      dismissError,
+      365      vote,
+
+⏺ Now wiring it into GameList:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/components/GameList.tsx'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The existing 56 tests still pass, and typecheck and lint are clean. Now the
+  new tests:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && cat > src/lib/sort.test.ts
+      <<'EOF'
+      import { describe, expect, it } from 'vitest'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ All 73 frontend tests pass. Now a real-Chrome check, since jsdom can't verify
+  layout or contrast. I'll rebuild the stack and seed 11 games, each added by a
+  separate user:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose up -d --build 2>&1 | tail
+      -1; until curl -sf http://localhost:8080/api/health >/dev/null; do sleep
+      2; done; S=/pri…)
+  ⎿  Error: Exit code 1
+      Container eoa-challenge-web-1 Started
+     Traceback (most recent call last):
+       File "<string>", line 1, in <module>
+     KeyError: 'games'
+
+⏺ Bash(cd ~/Websites/eoa-challenge && curl -s http://localhost:8080/api/games |
+      head -c 300; echo; docker-compose logs --tail=15 php 2>&1 | tail -15)  ⎿  (No output)
+
+⏺ The EOA API key expired overnight. This is the known gotcha in CLAUDE.md: keys
+  last about a day. I'll generate a new one straight into .env without printing
+  it. First, how did we do it before?
+
+⏺ Bash(cd ~/Websites/eoa-challenge && ls scripts; grep -n "api-key\|generate"
+      scripts/*.sh | head; grep -c "EOA_API_KEY" .env)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 1,30p scripts/probe-api.sh; grep -n
+      "api-key" PLAN.md | head -5)
+  ⎿  (No output)
+
+⏺ The endpoint is POST /api-key/generate. I'll look only at the response
+  structure, never the value, then write the key into .env:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a && curl -sS
+      -m 20 -X POST "$EOA_API_BASE_URL/api-key/generate" -o
+      /private/tmp/claude-501/-Users-ton…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      P=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/keyresp.js…)
+  ⎿  No matches found
+
+⏺ The new key is saved in the gitignored .env, and the API is working again. I'm
+  checking for leftover rows from the failed attempts before seeding. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && q() { docker-compose exec -T db mysql -N
+      -ugamevoting -pgamevoting gamevoting -e "$1" 2>/dev/null; }; echo
+      "games/users/actions:…)
+  ⎿  (No output)
+
+⏺ Eleven games are seeded after clearing 17 stray user rows left by the
+  expired-key attempts. I'm adding a few votes from fresh users next so the
+  ranks differ, then running the Chrome check. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad; H=(-H 'X-…)
+  ⎿  (No output)
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cat > $S/sort.mjs
+      <<'EOF'
+      import { c…)
+  ⎿  (No output)
+
+⏺ Sorting checks out at both viewports and the console is clean. Two items to
+  confirm: the "Targets <40px" hits are hidden dialog buttons, a false positive
+  from my script, and the one axe contrast hit on Rank likely came from sampling
+  mid-transition, so I'll rerun axe after the transition ends. · summary
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cd $S && sed -i '' "s|
+      await page.e…)
+  ⎿  (No output)
+  ⎿  (timeout 3m)
+
+⏺ That confirms it: zero axe violations once the transition settles at both
+  viewports. The earlier hit was only a mid-fade sample. Let me look at the
+  screenshots to check the visual result:
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Both viewports check out: the ranks match the votes and the end-of-list set
+  shows at 11 games. The brown tint on the A–Z button is only the hover state.
+  I'm documenting the feature next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -n "^## \|^### " PLAN.md | sed -n
+      1,40p; sed -n 252,262p PLAN.md)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 259,296p PLAN.md)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='PLAN.md'…)
+  ⎿  (No output)
+
+⏺ The sort feature is built on a new feat/sort branch, and nothing is staged or
+  committed.
+
+  - Frontend checks: typecheck and lint are clean, and all 73 tests pass (56
+    before, 17 new).
+  - Real Chrome: at 1280px and 390px there's no horizontal overflow, no console
+    problems, and axe reports zero violations. One early axe hit was a mid-fade
+    sample of the button color transition. It cleared once I waited for the
+    transition to settle.
+  - API key: the EOA key had expired overnight, which is the known gotcha. I
+    generated a new one straight into .env without printing it. .env is
+    gitignored, and the php container is restarted.
+  - Seed data: I left the 11 test games and the test users in place, so you can
+    check the feature yourself. The library currently holds Zelda, Mario Kart,
+    Tetris, Doom, Portal 2, Portal 10, Éclair Quest, eagle, Halo, Skyrim and
+    Baldur’s Gate. To start clean, say so and I'll flush it, or run
+    docker-compose down -v yourself for the local side.
+
+  What changed, by file
+
+  frontend/src/lib/sort.ts (new) holds the pure logic:
+  - sortGames() sorts by rank (votes, then lowest id) or name, in either
+    direction.
+  - Names: compared with Intl.Collator('en', numeric, base sensitivity), so case
+    and accents are ignored and "Portal 2" comes before "Portal 10".
+  - Tie-breaks: ties always go to the lowest id, in both directions.
+  - nextSort(): clicking the active button reverses it, and clicking the other
+    one starts in its default direction.
+  - Wording: helpers produce the heading and the announcement text.
+
+  frontend/src/components/SortControls.tsx (new) is the pair of toggle buttons:
+  - Positions: Rank on the left and A–Z on the right.
+  - State: aria-pressed marks the active one, and a down or up arrow shows the
+    direction on the active button only. The name button's text flips to "Z–A"
+    when reversed.
+  - Accessible names: they spell out the direction, for example "Sort by rank,
+    most votes first" and "Sort A–Z". Each contains its visible text, as WCAG
+    2.5.3 requires.
+  - Greyed state: with fewer than two games, the buttons use aria-disabled
+    (still focusable, clicks do nothing). A screen-reader-only note says
+    "Sorting is available once there are two games."
+
+  frontend/src/components/GameList.tsx:
+  - It holds the sort choice, which is not persisted, so a reload returns to
+    rank order.
+  - It derives the displayed order from the hook's vote-ordered list, so the
+    hook's optimistic updates, rollbacks and refreshes are untouched.
+  - Rank numbers come from each game's position in the vote-ordered list, so
+    they stay true in every order.
+  - With fewer than two games, the default order applies. The choice is
+    remembered and applies again when a second game arrives.
+  - The heading names the order: "Games, A to Z", "Games, fewest votes first"
+    and so on.
+  - The top controls render when the list is loaded. The second set below the
+    list appears from 11 games (BOTTOM_CONTROLS_MIN_GAMES), labeled "Sort games
+    (end of list)".
+  - Each change is announced through the existing live region ("Sorted
+    alphabetically, Z to A.").
+
+  frontend/src/hooks/useGameLibrary.ts: the only change is exporting announce.
+
+  PLAN.md: a new "Sorting" bullet in the frontend notes.
+
+  Tests:
+  - sort.test.ts: both directions, the tie-break, numeric and accent ordering,
+    no mutation of the input array, nextSort, and the wording.
+  - App.test.tsx "sorting":
+    - greyed out at 0 and 1 games, with one set of controls
+    - the initial state
+    - A–Z, then Z–A, with true ranks kept
+    - rank reversed, then restored
+    - the chosen order surviving a vote
+    - the second set appearing at 11 games, with both sets in sync
+    - axe
+
+  I didn't build any behavior beyond what we agreed, and nothing was pushed.
+  Tell me when to commit, and I'll keep the AI log as a separate commit as
+  before.
+
+❯ <ide_opened_file>The user opened the file /Users/tonyschappaugh/Websites/eoa-
+  challenge/frontend/src/components/GameList.tsx in the IDE. This may or may
+  not be related to the current task.</ide_opened_file>
+
+❯ I checked and it was working for me with a full list can you restart the game
+  so I can check the behavior 0 or 1 games building to 12
+
+⏺ Resetting to an empty library: I'll flush the EOA side and recreate the local
+  database.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a && curl -s -X
+      POST "$EOA_API_BASE_URL/cache/flush" -d "api_key=$EOA_API_KEY"; echo;
+      docker-compose d…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The game is restarted with an empty library and a clean database, so you can
+  start at 0 games at http://localhost:8080/.
+
+  Each identity gets one add or vote per day, so building a list to 12 would
+  normally take 12 browsers or windows. You can get a fresh identity in the same
+  window instead. In Chrome DevTools, go to Application → Cookies → localhost
+  and delete the uid cookie, then reload. The next game you add is from a new
+  user.
+
+  What to check at each size:
+  - 0 games: both buttons greyed out, and clicking does nothing.
+  - 1 game: still greyed out, and a single set of controls above the list.
+  - 2 games: the buttons come alive. Rank is pressed, and A–Z sorts the list.
+  - 11 games: the second set appears below the list, labeled "Sort games (end of
+    list)".
+  - 11 down to 10: remove a game as its creator and the second set disappears.
+    The top set stays and keeps whatever sort you chose.
+
+  If you'd rather not click through 12 adds, tell me how many games you want and
+  I'll seed them from separate users, and you can add the last few by hand.
+❯ I have added two games please add 9 more from different users
+
+⏺ Checking what's in the library first so I don't duplicate your two:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && curl -s http://localhost:8080/api/games |
+      python3 -c "import sys,json; print([g['title'] for g in
+      json.load(sys.stdin)['games']])…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge &&
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad; mkdir -p…)
+  ⎿  (No output)
+
+⏺ I added 9 games, each from a different user, and the library now has 11:
+  Frogger and Chess (yours), plus Zelda, Tetris, Mario Kart, Portal 2, Portal
+  10, Halo, Doom, Éclair Quest and Skyrim.
+
+  Reload http://localhost:8080/ and you should see the second set of sort
+  buttons below the list. Here's what to test next:
+  - Add a 12th game: delete your uid cookie first, or use a window that hasn't
+    acted today, so you get a fresh daily action.
+  - Remove down to 10: remove one of your own games, using the identity that
+    added it. The bottom controls should disappear, while the top set stays on
+    your chosen sort.
+  - A–Z order: "Éclair Quest" should sort between "Doom" and "Frogger", and
+    "Portal 2" before "Portal 10".
+
+  All votes are at zero, so the rank order is just the order the games were
+  added, oldest first. Vote on a few games, using the cookie trick for new
+  identities, to see the rank order change.
+
+❯ can you reset the game with 9 total so i can check before and after the 10
+  threshold
+
+⏺ Resetting again, then seeding 9 games from 9 separate users:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a && curl -s -X
+      POST "$EOA_API_BASE_URL/cache/flush" -d "api_key=$EOA_API_KEY"; echo;
+      docker-compose d…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The library is reset and seeded with 9 games from 9 separate users: Zelda,
+  Tetris, Mario Kart, Portal 2, Portal 10, Halo, Doom, Éclair Quest and Skyrim.
+  Reload http://localhost:8080/ to see it.
+
+  This is how I'd test the threshold:
+  1. At 9 games: only the top sort buttons are enabled.
+  2. Add a 10th game. You're a fresh identity, because your old uid cookie no
+     longer matches anything after the reset. The list should still show only
+     the top set.
+  3. Add an 11th game. Delete the uid cookie first, in DevTools → Application →
+     Cookies → localhost, then reload. The second set appears below the list,
+     labeled "Sort games (end of list)".
+  4. Remove your 11th game (the Remove button shows on the games you added). The
+     second set should disappear, and the top set should keep your chosen sort.
+
+  Since you're testing the threshold, the second set shows from 11 games, which
+  is "more than 10". If you'd prefer it at 10 or more, it's a one-line change to
+  BOTTOM_CONTROLS_MIN_GAMES.
+
+❯ That all works please stage and commit locally and provide the script to
+  merge into main.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add frontend PLAN.md && git commit -q
+      -F - <<'EOF'
+      feat: add rank and A-Z sorting to the game list…)
+  ⎿  (No output)
+
+⏺ I committed the sort feature on feat/sort as b30eee9. The AI session log is in
+  its own commit, ddff29a. The working tree is clean and nothing has been
+  pushed.
+
+  Here's the merge script. Run it from the repo root:
+
+  cd ~/Websites/eoa-challenge
+
+  # 1. Commit the live AI log again if it changed since my last commit
+  git add ai-logs && git commit -m "chore: update AI session log" || true
+
+  # 2. Publish the branch and wait for CI to go green on GitHub (Actions tab)
+  git push -u origin feat/sort
+
+  # 3. Merge into main
+  git checkout main
+  git merge --no-ff feat/sort
+
+  # 4. If the merge stops on the AI log file, resolve it by keeping both sides:
+  #      git checkout --theirs ai-logs/session-2026-11-11-16730bd4.md
+  #      git add ai-logs && git commit --no-edit
+  #    (--theirs keeps the feat/sort copy, which is the newer, longer log)
+
+  # 5. Push main
+  git push
+
+  - Last time the log conflicted and needed this kind of resolution. If you'd
+    rather avoid it in future, we can add the .gitattributes ai-logs/*.md
+    merge=union rule I mentioned earlier.
+  - If step 3 reports a conflict only in the log file, step 4 resolves it. If
+    any other file conflicts, stop and send me the output.
+  - Before step 3, your local main should be up to date with origin/main. Run
+    git pull on main first if you've made changes elsewhere.
+
+  The next phases are the design work on a new feat/design branch, then
+  docs/submission.
+
+❯ The steps above worked
+
+⏺ Good, main now has everything: the frontend, both review rounds, the
+  punctuation folding, and the sorting.
+
+  - CLAUDE.md is out of date. Its "Current status" still says feat/frontend is
+    waiting to be merged. I'll update it on the next branch, so main stays
+    untouched until you merge.
+  - EOA key: it expires daily. If the app shows "The game library is
+    unavailable", I can generate a new one into .env.
+  - Local data: the library holds 9 seeded games from the threshold test. Say
+    the word and I'll reset it.
+
+  Next is the design work. To get started, tell me what you want to change:
+  - the overall look (type, color, spacing, layout)
+  - specific components, such as the list rows, the buttons, the header, or the
+    limit banner
+  - whether you have a reference, mockup, or the Mill Creek styling in mind
+
+  I'd branch feat/design from main. Keeping the accessibility checks (contrast,
+  44px targets, focus rings, 390px mobile) as part of the work will help, since
+  design changes are where those usually regress.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/.dockerignore in the
+  IDE. This may or may not be related to the current task.</ide_opened_file>
+
+❯ Here are the design changes I would like to accomplish. Review the list but
+  only give direction on which files would need to be modified to make these
+  updates and the best practices for adding the SVG and PNG images.
+  Font Changes:
+
+  Change the font to Google Montserrat. Keep the font-weight and colors the
+  same for now.
+  Text Changes:
+
+  Game Voting --> Vote for Your Favorite Game
+
+  Suggest games for the office library and vote for the ones you want most. -->
+  We want your input to help us build the best office game library. You can
+  suggest games or vote for the games once per day. As the list grows, keep
+  checking back every day and add or vote.
+
+  Layout Changes:
+
+  Header: Add the Essense of Australia SVG logo on the left and move the
+  heading "Code Challenge" to the right. Let me know the best way to supply the
+  SVG file
+
+  Main Text:
+
+  I would like to add an image to the left of the introductory text in a two
+  column layout on desktop and tablet but have the image above the introductory
+  text on mobile. Let me know the best way to add the PNG file.
+
+⏺ You asked for direction only, so I won't change anything. I'll check a few
+  existing files so the direction is accurate, since the CSP and the Docker
+  build both affect how fonts and images can be added.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && cat docker/security-headers.conf; echo
+      ---; cat frontend/index.html; echo ---; cat frontend/.dockerignore; echo
+      ---; ls frontend…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rn "Game Voting\|Suggest games\|Code
+      Challenge\|Essense" frontend/src frontend/index.html README.md PLAN.md
+      CLAUDE.md 2>/de…)
+  ⎿  (No output)
+
+⏺ This is direction only, and I haven't changed anything. Two findings from the
+  current setup shape the advice below. First, the Content Security Policy
+  allows fonts and images only from our own origin. Second, src/assets/ files
+  get hashed filenames and a one-year immutable cache from nginx, while public/
+  files get no cache.
+
+  1. Montserrat
+
+  Don't load it from Google Fonts. The CSP has style-src 'self' and font-src
+  'self', so the Google stylesheet and font requests would be blocked. Loading
+  from Google also sends your visitors' IPs to a third party. Self-host instead.
+
+  Best way: the @fontsource-variable/montserrat npm package
+  - It's one variable font, so every weight we use (200, 400, 600, 700) works,
+    and "keep the weights the same" is trivially satisfied.
+  - It's already split by character range, so accented titles like "Éclair"
+    work, and the browser only downloads the ranges it needs.
+  - Vite bundles the files into /assets/, so they get hashed filenames and the
+    immutable cache automatically.
+  - No nginx or CSP change is needed, and the license is OFL.
+
+  Files to modify
+  - frontend/package.json and package-lock.json: add the dependency with npm
+    install.
+  - frontend/src/main.tsx: add import '@fontsource-variable/montserrat'.
+  - frontend/src/index.css: change --font-sans in @theme to 'Montserrat
+    Variable', keeping the existing sans-serif stack as the fallback.
+
+  Things to watch
+  - Montserrat is noticeably wider than Helvetica, so text wraps sooner.
+    Re-check the 390px layout, the long-title wrapping, and the button widths in
+    real Chrome.
+  - The h1 uses font-extralight (200), which is very thin in Montserrat. You
+    asked to keep weights, so I won't touch it, but it may read faint at some
+    sizes. It may be worth revisiting in the design review.
+
+  2. Text changes
+
+  Files: frontend/src/App.tsx (the h1 and the intro paragraph) and
+  frontend/index.html (the page <title>, "Game Voting" today). I'd update the
+  title to match the new heading, so tab titles and screen-reader page names
+  stay consistent. Tell me if you'd rather keep it. No existing test checks that
+  text, so tests only need updating if I add new ones.
+
+  One wording issue. "You can suggest games or vote for the games once per day"
+  can be read as one suggestion and one vote each day. The actual rule is one
+  action in total, either a vote or a suggestion, and the banner under the intro
+  says that. I'd tighten the sentence, for example "Once per day, you can
+  either suggest a game or vote for one." The wording is yours to decide.
+
+  3. Header
+
+  Files: frontend/src/App.tsx, where the header block has the text "Essense of
+  Australia" and "Code Challenge". The logo replaces the left text, and "Code
+  Challenge" moves right. At 390px, check that both still fit.
+
+  Supplying the SVG
+  - Location: save it as frontend/src/assets/eoa-logo.svg (new folder). The
+    preferred route is an import in App.tsx used in an <img>. Not public/, since
+    it would miss the hashed filename and cache headers.
+  - Why <img>, not inline SVG: the CSP is style-src 'self', so any <style>
+    blocks or style attributes in an SVG inlined into the page would be blocked.
+    Inside an <img> they're isolated from the page and render as designed. The
+    only downside is that I can't recolor it with CSS, which is fine unless you
+    need a dark-mode variant.
+  - Before you send it:
+    - It needs a viewBox. I'll set explicit width and height on the <img> to
+      prevent layout shift.
+    - Text in the logo should be converted to outlines, so it doesn't depend on
+      a font.
+    - Run it through SVGO to remove editor metadata, which usually cuts the size
+      by half.
+    - It must not contain scripts or external references. I'll read the file
+      before I use it.
+  - Alt text: alt="Essense of Australia". It replaces the visible text, so it
+    needs the same accessible name.
+  - Contrast: check the logo's colors against the header background (white
+    today).
+  - Public repo: the repo is public, so confirm you're comfortable including
+    EOA's logo in it. It's their own challenge, so this is probably fine, but
+    it's worth being deliberate.
+  - How to send it: drop the file at that path, or tell me where it is on disk,
+    and I'll copy it in.
+  - Optional: frontend/public/favicon.svg is still the default purple Vite icon.
+    You could replace it with an EOA mark.
+
+  4. Intro image, two columns on desktop and tablet
+
+  Files: frontend/src/App.tsx (the intro block becomes a two-column grid on md
+  and up, stacked on mobile). I might extract it as
+  frontend/src/components/Intro.tsx to keep App.tsx readable.
+
+  Container width. <main> and the header are both max-w-2xl (672px). Two columns
+  in that would leave about 320px each. You'll want to widen the container or
+  just the intro section. Where the page gets wider is a design decision I'd
+  confirm with you.
+
+  Supplying the PNG
+  - Location: frontend/src/assets/ (e.g. office-games.png), imported in App.tsx
+    for a hashed filename and the immutable cache.
+  - Size: export at about 2× the largest display width. If it displays at about
+    400px wide, supply about 800 to 1000px.
+  - Weight: compress it with oxipng, Squoosh or ImageOptim. A good target is
+    under about 200 to 300KB. If it's a photo, a lossless PNG will be big. I can
+    also generate a WebP copy and serve it with a PNG fallback in a <picture>,
+    which is often 60 to 80% smaller.
+  - Markup:
+    - width and height attributes to reserve space.
+    - h-auto w-full so it scales on mobile.
+    - Since it's near the top of the page, don't lazy-load it.
+      fetchpriority="high" is reasonable.
+    - A srcset with two sizes is optional but worthwhile if the file is large.
+  - Alt text: I need to know what it shows. If it's purely decorative, alt="" is
+    correct. If it conveys something, I'll describe it.
+  - Aspect ratio: if it's tall, I'd crop it with a fixed aspect ratio and
+    object-cover on mobile, so it doesn't push the form far down the page.
+
+  5. Checks after the change
+
+  Typecheck, lint and tests, plus a real-Chrome pass for the 390px and desktop
+  layouts (overflow, 44px targets, axe contrast on the new header). Also
+  CLAUDE.md and PLAN.md, which mention the stack and styling.
+
+  What I need from you
+
+  1. The SVG logo and the PNG file, and their locations.
+  2. What the image depicts, for the alt text.
+  3. Your choice of wording for the "once per day" sentence.
+  4. Whether to widen the page container or only the intro section.
+
+❯ Lets not include the logo since this is not an offical company site. I agree
+  with your suggestion on the copy for the introduction. Lets keep the heading
+  at 400. here is the alt for the image: Retro gaming setup with lava lamps and
+  joysticks. lets widen just the intro section. I have added the PNG to the
+  src/assets directory. the image size is 727 × 1000. Let me know if you need
+  any more information to proceed
+
+⏺ I have what I need. First I'm creating the branch and checking the image:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git status --short | head -5; git branch
+      --show-current; git checkout -q main && git checkout -q -b feat/design &&
+      git branch --s…)
+  ⎿  (No output)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ It's a 214 KB palette PNG, already well optimized, and the orange and cream
+  illustration suits the warm palette. I'll use it as is. Now installing the
+  font and making the edits:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && npm install
+      @fontsource-variable/montserrat 2>&1 | tail -4; grep -n "montserrat"
+      package.json; ls node_modules/@fontsour…)
+  ⎿  (No output)
+
+⏺ It's installed under the SIL Open Font License and npm audit found no
+  vulnerabilities. I'll import only the upright wght.css, since we use no
+  italics. Now the code:
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      def edit(p, pairs):…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ Existing tests pass. Adding tests for the new content:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && git diff --stat index.html | tail
+      -1 && python3 - <<'EOF'
+      p='src/App.test.tsx'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ 74 tests pass. Now real Chrome, since the CSP, the font loading and the layout
+  can only be checked there:
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cat > $S/design.mjs
+      <<'EOF'
+      import {…)
+  ⎿  (No output)
+  ⎿  (timeout 3m)
+
+⏺ Chrome checks pass: Montserrat and the image load from our own server, nothing
+  violates CSP, and axe finds zero violations at all three widths. I'm
+  comparing the screenshots visually next. · summary
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Screenshots look right, and the image stacks above text on mobile. On desktop
+  the header text sits at x=192 while the intro starts at x=208, because the
+  header's padding is outside its max-width container; I'm fixing that alignment
+  next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/App.tsx'…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && python3 - <<'EOF'
+      p='src/App.tsx'…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The header now aligns with the intro at x=208, and the checks pass at all
+  three widths. I'm updating CLAUDE.md's stale "Current status" section next.
+  · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 153,172p PLAN.md; sed -n '/^##
+      Current status/,/^## Frontend contract/p' CLAUDE.md)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      def edit(p, pairs):…)
+  ⎿  (No output)
+
+⏺ The design changes are built on a new feat/design branch, and nothing is
+  staged or committed.
+
+  Checks:
+  - Tests: typecheck and lint are clean, and all 74 frontend tests pass (73
+    before, plus 1 new).
+  - Real Chrome at 1280, 768 and 390px:
+    - Zero axe violations and no horizontal overflow.
+    - No CSP violations or external requests.
+    - Montserrat is served from our own server, and the font and the image get
+      the one-year immutable cache header.
+    - The h1 computes to weight 400.
+
+  What changed
+
+  - frontend/package.json, package-lock.json: adds
+    @fontsource-variable/montserrat, with 0 audit findings. I imported only the
+    upright variable font.
+  - frontend/src/main.tsx and src/index.css: import the font and make Montserrat
+    first in --font-sans, with the old stack as the fallback. Font weights are
+    unchanged.
+  - frontend/src/App.tsx:
+    - Heading and copy: the heading is "Vote for Your Favorite Game" at normal
+      (400) weight. The intro reads: "We want your input to help us build the
+      best office game library. Once per day, you can either suggest a game or
+      vote for one. As the list grows, keep checking back every day to add or
+      vote."
+    - Image layout: the image sits left of the heading and text from 768px up,
+      in a 2-to-3 column split. On mobile it's above them and cropped to 4:3 so
+      the form isn't pushed far down. It has your alt text, and width, height
+      and fetchpriority="high" set.
+    - Page widths: only the intro section is widened (max-w-4xl). The banner,
+      form and list stay in the max-w-2xl column, centered.
+    - Header: "Code Challenge" moved to the right. It's aligned with the intro's
+      left edge.
+  - frontend/index.html: the page title now reads "Vote for Your Favorite Game".
+  - frontend/src/App.test.tsx: a new test for the heading, the intro text, and
+    the image alt and size attributes.
+  - PLAN.md: notes on the self-hosted font and the page layout.
+  - CLAUDE.md: the status section was stale (it still said feat/frontend needed
+    merging), so I brought it up to date. It now lists the review fixes,
+    punctuation folding and sorting as merged, and design as in progress.
+
+  Three judgment calls to confirm
+
+  1. Header without the logo. You dropped the logo, so I kept the "Essense of
+     Australia" text on the left and still moved "Code Challenge" to the right.
+     Tell me if you'd rather leave the header as it was.
+  2. Header width. I widened the header container to match the intro, so the two
+     align.
+  3. Column alignment. On desktop the intro (208 to 1072px) is wider than the
+     form and list (304 to 976px), so the image's left edge sits 96px left of
+     the form's. That follows from "widen just the intro", but it's the first
+     thing I'd look at in the design review.
+
+  The image is a 214 KB palette PNG, already compact, so I used it as is. A WebP
+  copy could shave some size, but it isn't needed.
+
+  The local library has 11 games, including Frogger and GTA 3, if you want to
+  look at the page. Tell me when to stage and commit, and I'll commit this
+  separately from the AI log as before.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/src/App.tsx in the IDE.
+  This may or may not be related to the current task.</ide_opened_file>
+
+❯ Everything looks good. Stage and commit locally. Then provide instructions
+  for pushing to github.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add frontend CLAUDE.md PLAN.md && git
+      commit -q -F - <<'EOF'
+      feat: redesign intro with Montserrat, new copy, and illustration…)
+  ⎿  (No output)
+
+⏺ I committed the design work on feat/design as bca8f5a, and the AI session log
+  is in its own commit, 60d4519. The working tree is clean and nothing has been
+  pushed.
+
+  Pushing to GitHub
+
+  cd ~/Websites/eoa-challenge
+
+  # 1. Make sure you're on the right branch
+  git branch --show-current          # should print feat/design
+
+  # 2. Commit the live AI log again if it changed since my last commit
+  git add ai-logs && git commit -m "chore: update AI session log" || true
+
+  # 3. Push the branch (first push sets the upstream)
+  git push -u origin feat/design
+
+  Then check the Actions tab on GitHub. All five jobs (backend, frontend,
+  docker, secret scan, dependency audit) should go green. This push adds a
+  dependency, so the dependency audit job is the one to watch.
+
+  Merging into main
+
+  Once CI is green:
+
+  git checkout main
+  git pull                           # make sure main is current
+  git merge --no-ff feat/design
+
+  # If it stops on the AI log file, keep the feat/design copy:
+  #   git checkout --theirs ai-logs/session-2026-11-11-16730bd4.md
+  #   git add ai-logs && git commit --no-edit
+
+  git push
+
+  A note on the rebuild after merging: the running local stack already reflects
+  this branch. After you switch branches in the future, run docker-compose up -d
+  --build so the containers match what's checked out.
+
+  After this merge, the next phase is docs/submission, which is the README, the
+  final accessibility pass, the fresh-clone check and the transcript export.
+
+❯ It looks like those actions only run on main
+
+⏺ That would explain why you don't see runs for your feature branches. I'll
+  confirm in the workflow file:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n 1,20p .github/workflows/ci.yml)
+  ⎿  (No output)
+
+⏺ You're right. The workflow runs on push to main and on pull_request, so
+  pushing a feature branch runs nothing until a pull request is opened. Last
+  time CI first ran after the merge to main, so a failure would have surfaced
+  only after merging.
+
+  Your options
+
+  1. Open a pull request from feat/design into main on GitHub. The existing
+     pull_request trigger then runs all five jobs. You can still merge locally
+     with the script and push main. GitHub marks the PR as merged automatically.
+     This needs no code change, and it fits your preference of not having me
+     open PRs.
+  2. Run CI on every branch push, which is my recommendation. Change the trigger
+     in .github/workflows/ci.yml to:
+  on:
+    push:
+      branches: ['**']
+     - GitHub reads the workflow file from the commit you push, so a commit
+       containing this change would run CI on the very push that carries it.
+     - Results attach to the commit, so they appear on a PR too.
+     - If I keep pull_request as well, every push to a branch with an open PR
+       runs twice. For a solo repo I'd drop pull_request, but the trade-off is
+       that fork PRs wouldn't be checked, which doesn't matter here.
+  3. Leave it. CI only runs after the merge to main.
+
+  I'd choose option 2. It's a one-line change, and CI feedback before every
+  merge is the point of having CI. It's also a small, reasonable thing to
+  mention in the README.
+
+  If you agree, I'll make the change as its own commit on feat/design (ci: run
+  checks on every branch push), local only. You'd then push the branch as before
+  and the five jobs should appear. Or if you'd rather open a PR now, no change
+  is needed.
+
+❯ lets go with option 2
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='.github/workflows/ci.yml'…)
+  ⎿  (No output)
+
+⏺ The concurrency group keys on github.ref, so each branch only cancels its own
+  earlier runs and the old trigger is no longer a dependency. I'm checking that
+  the file is still valid, since it has no event-specific conditions. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -n "if:" .github/workflows/ci.yml;
+      python3 -c "
+      import sys…)
+  ⎿  (No output)
+⏺ Bash(cd ~/Websites/eoa-challenge && ruby -ryaml -e
+      'd=YAML.load_file(".github/workflows/ci.yml"); puts "parsed ok; triggers:
+      #{(d[true]||d["on"]).inspect}; jobs: #{d…)
+  ⎿  (No output)
+
+⏺ I committed the CI trigger change on feat/design as ffacd9b, separate from the
+  design commit. The workflow parses correctly, with a push trigger on every
+  branch and all five jobs intact (backend, frontend, docker, secrets, audit).
+  Nothing has been pushed.
+
+  What to expect on the push. GitHub uses the workflow file from the commit you
+  push, so pushing feat/design should start the five jobs on that same push.
+  Check the Actions tab afterward.
+
+  cd ~/Websites/eoa-challenge
+  git add ai-logs && git commit -m "chore: update AI session log" || true
+  git push -u origin feat/design
+
+  If the runs don't appear, check Settings → Actions → General to confirm
+  Actions is enabled for all branches, and tell me.
+
+  Two things to watch in the results
+  - Frontend job: it now installs the new font dependency and builds with the
+    image, so it's the first CI run on the design changes.
+  - Dependency audit job: it checks the new package. Locally npm audit found 0
+    issues.
+
+  If everything is green, merge with the script from before.
+
+❯ All report green after merge. i have merged feat/design and that has all
+  green. Before we proceed. How can I review the contents of the database?
+
+⏺ I'll check how the database container is configured so the commands match:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n '/^  db:/,/^[a-z]/p'
+      docker-compose.yml | head -30; grep -n "DB_" .env.example; sed -n 1,45p
+      backend/migrations/001_init.s…)
+  ⎿  (No output)
+
+⏺ Nothing is exposed on your Mac's network, so you use the MySQL client inside
+  the container. The database is gamevoting, and the user and password are both
+  gamevoting, which are the defaults in docker-compose.yml. The root password is
+  random and never shown.
+
+  Quick ways in
+
+  Interactive shell (type exit to leave):
+  cd ~/Websites/eoa-challenge
+  docker-compose exec db mysql -ugamevoting -pgamevoting gamevoting
+
+  One-off query, with -t for table formatting:
+  docker-compose exec -T db mysql -t -ugamevoting -pgamevoting gamevoting -e
+  "SELECT * FROM games"
+
+  The warning "Using a password on the command line interface can be insecure"
+  is expected here. Those are local-only dev credentials.
+
+  The four tables
+
+  ┌───────────────┬──────────────────────────────────────────────────────────┐
+  │     Table     │                      What it holds                       │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │ users         │ One row per identity cookie, plus the time zone locked   │
+  │               │ at the user's first write                                │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │               │ Local ID, upstream api_id, display title, the            │
+  │ games         │ duplicate-detection key title_normalized, and created_by │
+  │               │  (null for games imported from outside the app)          │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │ votes         │ The vote ledger, one row per user and game, with the     │
+  │               │ local date it was cast                                   │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │ daily_actions │ One row per user per local day, which is how the "one    │
+  │               │ vote or one add" rule is enforced                        │
+  └───────────────┴──────────────────────────────────────────────────────────┘
+
+  Useful queries
+
+  -- Games with their creator and vote count (from our ledger)
+  SELECT g.id, g.api_id, g.title, g.title_normalized,
+         LEFT(g.created_by, 8) AS creator, COUNT(v.user_id) AS ledger_votes
+  FROM games g LEFT JOIN votes v ON v.game_id = g.id
+  GROUP BY g.id ORDER BY g.id;
+
+  -- Who did what today
+  SELECT LEFT(user_id, 8) AS user, local_date, type, ref_id FROM daily_actions
+  ORDER BY created_at;
+
+  -- All votes
+  SELECT LEFT(user_id, 8) AS user, game_id, cast_local_date FROM votes;
+
+  -- Users and their locked time zones
+  SELECT LEFT(id, 8) AS user, timezone, created_at FROM users;
+
+  -- Table sizes at a glance
+  SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM games) AS
+  games,
+         (SELECT COUNT(*) FROM votes) AS votes, (SELECT COUNT(*) FROM
+  daily_actions) AS actions;
+
+  Notes:
+  - title_normalized shows the folded duplicate key. For example, Baldur’s Gate
+    appears as baldur's gate.
+  - Vote counts: the counts the app shows come from the EOA API, which is the
+    system of record. Our votes table is the ledger of who voted, so the two
+    should match for games added through this app.
+  - Read-only: I'd keep to SELECT. Editing rows by hand can put the local state
+    out of step with the EOA API.
+
+  A GUI client
+
+  TablePlus, Sequel Ace or a VS Code SQL extension need a published port. Add a
+  local-only file so the committed compose file stays untouched:
+
+  # docker-compose.override.yml  (don't commit this)
+  services:
+    db:
+      ports:
+        - '127.0.0.1:3307:3306'
+
+  Then run docker-compose up -d and connect to host 127.0.0.1, port 3307, user
+  gamevoting, password gamevoting. Binding to 127.0.0.1 keeps it off your
+  network. Delete the file afterward and restart to close the port. If you want
+  this, I'd add docker-compose.override.yml to .gitignore first so it can't be
+  committed by accident.
+
+  I can also run any of these queries for you.
+
+❯ OK no additional work required. I wanted to make sure the db reflected what I
+  saw in chrome. Before we go further I want to test that the repo can be run
+  with a docker command. What would be the best way to test that?
+
+⏺ The best test is a fresh clone of the public repo into a separate folder,
+  started with the same command a reviewer would use. It proves that nothing
+  depends on files that only exist on your machine, such as .env, the Docker
+  volume and the node_modules and vendor folders.
+
+  Steps
+
+  1. Free port 8080 and start from nothing. The clone uses its own project name,
+  so it gets its own containers and database volume. It does need port 8080, so
+  stop your running stack first. This keeps its data:
+  cd ~/Websites/eoa-challenge
+  docker-compose down
+
+  2. Clone from GitHub, not from your working folder. This tests what's actually
+  pushed:
+  git clone https://github.com/tschappaugh/eoa-challenge.git ~/eoa-fresh
+  cd ~/eoa-fresh
+  git log --oneline -1        # should match your latest merge on main
+
+  3. Run the command with no .env.
+  docker-compose up
+  It should stop at once with the message about EOA_API_KEY. That checks the
+  missing-key path, which is the first thing a reviewer hits.
+
+  4. Give it a key, the way a reviewer would. Generate one from the EOA API and
+  put it in .env:
+  curl -s -X POST https://codechallenge.essensedesigns.info/api-key/generate
+  echo 'EOA_API_KEY=<paste the key value>' > .env
+  This is the step the README has to explain. There's currently no helper script
+  for it, so this test will show what the README needs. I'd also suggest a
+  small scripts/generate-key.sh that writes the key straight into .env without
+  printing it.
+
+  5. Start it for real.
+  docker-compose up --build
+  The first build takes a few minutes, because the frontend and PHP dependencies
+  build inside Docker. Then check:
+  - docker-compose ps shows web, php and db running, with db healthy.
+  - curl http://localhost:8080/api/health returns {"status":"ok"}.
+  - http://localhost:8080 loads with the font and the image, and an empty list.
+  - Smoke test in the browser: add a game, vote from a second identity, and
+    reload to confirm it persisted. Then restart with docker-compose down
+    followed by docker-compose up -d and confirm the data survived, which shows
+    the database is real.
+
+  6. Run the tests the way a reviewer would.
+  docker-compose --profile test run --rm --build test
+  Expect 86 backend tests to pass.
+
+  7. Clean up and go back to your own copy.
+  docker-compose down -v
+  cd ~ && rm -rf ~/eoa-fresh
+  cd ~/Websites/eoa-challenge && docker-compose up -d
+
+  Things this test can catch
+
+  - A file the build needs but .gitignore or .dockerignore excludes.
+  - A migration that only worked on your existing database volume.
+  - A missing or unclear key error message.
+  - Anything that assumes your local paths.
+
+  A few caveats:
+  - Same key: if you copy your existing .env into the clone, the test works but
+    skips the key-generation step. A fresh key is more faithful.
+  - Different platform: reviewers may be on Intel or Linux. The images we use
+    are all multi-platform, and CI already builds the Docker image on Linux, so
+    this is well covered.
+  - When to repeat it: do this once now to find problems, and once more after
+    the README is written, following only the README's own instructions.
+
+  Would you like me to run the fresh-clone test myself? I'd work from a scratch
+  folder outside the repo, and I'd need to stop your running stack for port
+  8080. It also means generating a new EOA key for the clone. Otherwise the
+  commands above are all you need.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/.env in the IDE. This may or may
+  not be related to the current task.</ide_opened_file>
+
+❯ I was able to clone the repository and get the repo to run in docker. What
+  steps are left. I would like to run a final check for secruity, best
+  practices etc before I ship also
+
+⏺ Remaining steps
+
+  1. Final security and best-practices review (Opus)
+  This comes first, because it may change code and the README should describe
+  the final state. I'd make it a full-repo review, not just a diff:
+  - Secrets, which matter most here:
+    - Run gitleaks over the whole git history.
+    - Search ai-logs/ and every commit for the EOA key.
+    - Confirm .env was never tracked, and that .env.example and the README hold
+      no real values.
+  - Dependencies: npm audit and composer audit in CI, plus a check for outdated
+    or unpinned items. The CI actions could also be pinned to commit SHAs.
+  - Web security: a re-check of the CSP and security headers, cookies, CSRF,
+    rate limits and input handling. Review the Dockerfiles too, such as whether
+    containers run as non-root and what's exposed.
+  - Code review: one more pass over the backend and frontend. I'd run
+    /security-review and /code-review high against the whole project, using the
+    first commit as the baseline.
+  - Licenses and assets: the Montserrat font is OFL, which is fine. For the
+    illustration, since the repo is public, make sure you have the right to
+    include it. If it came from a stock site or a generator, the license may
+    require attribution or may restrict redistribution.
+  - Things I'd expect it to flag, which are accepted trade-offs: the default
+    gamevoting database credentials (local-only, not exposed on a port), no
+    HTTPS locally, and identity by cookie. These belong in the README's
+    limitations section.
+
+  2. Fixes from the review
+  On a branch such as fix/final-review, committed locally and pushed by you as
+  before.
+
+  3. docs/submission
+  - README:
+    - How to run it, and how to generate the key. I'd add a small
+      scripts/generate-key.sh that writes it into .env without printing it. It's
+      an error-prone manual step that the fresh-clone test showed reviewers
+      will hit first.
+    - Test commands, including --build.
+    - How AI was used (the hooks and the logs).
+    - Design decisions and the EOA API quirks.
+    - Limitations and future improvements, such as pagination and a focus
+      refresh.
+  - Final accessibility pass: automated checks are already clean. This adds a
+    keyboard-only run, a 200% zoom and 320px reflow check, reduced motion, and a
+    screen-reader spot check if you can.
+  - CLAUDE.md status brought up to date.
+
+  4. Re-run the fresh-clone test
+  Follow only the README's own instructions this time. It also tests that the
+  README is correct.
+
+  5. Transcript and ship
+  - Do the final /export and run scripts/scrub-transcript.sh. Search the result
+    for the key before committing it. This comes last so the transcript includes
+    the review and the README work.
+  - Commit the final AI log. You push and merge as usual.
+  - Confirm CI is green on main.
+  - Check the public repo while logged out, or in a private window, to be sure
+    it shows everything and nothing it shouldn't.
+  - Submit however the challenge instructions say. I haven't seen that part, so
+    check the instructions for what to send and by when.
+
+  Suggested order
+
+  1. Switch to Opus and run the full review.
+  2. Fix the findings.
+  3. Switch back to Sonnet for the README and docs.
+  4. Fresh-clone retest.
+  5. Transcript and submission.
+
+  Also, .env is open in your editor. Close the tab before the transcript export,
+  and don't paste its contents anywhere. The hooks redact the key, but it's
+  easier not to need them.
+
+  Want to switch to Opus now and start the review?
+
+❯ OK I am switching to Opus.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current; git status
+      --short | head -5; git fetch -q origin; git status -sb | head -1; git log
+      --oneline -3; git…)
+  ⎿  (No output)
+
+⏺ I'm on main in sync with origin, with only the live AI log uncommitted. Next
+  I'll run the secrets check first, with the key read from the environment and
+  never printed. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a
+      echo "== .env tracked or ever committed?"; git ls-files .env | wc -l; git
+      log --all --oneline -- .en…)
+  ⎿  (No output)
+
+⏺ The current key isn't in git history, the working tree, or the AI logs, and
+  .env was never tracked. I'm now scanning the full history and logs for any
+  leftover 32-character hex value, since old keys could still appear there.
+  · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge
+      echo "== 32-hex values added anywhere in history (excluding lockfiles),
+      unique count:"…)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ /model opus
+  ⎿  Set model to claude-opus-5-5
+
+❯ pleae stop and begin again. I restarted opus in the middle of your work.
+
+⏺ I stopped the interrupted read-only search, so nothing changed, and I'm
+  restarting the final security review: secrets, dependency audits, Docker/CI
+  config, then a code-level pass, reporting findings before making any changes.
+  · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && set -a && . ./.env && set +a
+      echo "== branch / sync"; git branch --show-current; git status -sb | head
+      -1…)
+  ⎿  (No output)
+
+⏺ History is clean with no key-shaped values in tracked files, but one 32-hex
+  value sits in a gitignored log that I want to identify, so I'm checking its
+  context with the value masked. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -oE '.{0,90}\b[0-9a-f]{32}\b.{0,60}'
+      ai-logs/session-2026-11-11-16730bd4.jsonl | sed -E
+      's/\b[0-9a-f]{32}\b/<32-HEX MASKED>/…)
+  ⎿  (No output)
+
+⏺ The 0123456789abcdef… value is a deliberate fake from scripts/test-redact.sh,
+  and the redactor masked the real-looking key, so secrets look clean. Moving on
+  to dependencies next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend && echo "== npm audit (all deps)";
+      npm audit 2>&1 | tail -3; echo "== npm audit (prod only)"; npm audit
+      --omit=dev 2>&1 | t…)
+  ⎿  (No output)
+  ⎿  (timeout 10m)
+
+⏺ Dependencies are clean with zero known vulnerabilities, and the only outdated
+  packages are major versions, which I'd hold back before submission. Docker, CI
+  and config are next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && echo "===== docker-compose.yml"; cat
+      docker-compose.yml; echo "===== backend/Dockerfile"; cat
+      backend/Dockerfile; echo "===== web…)  ⎿  (No output)
+
+⏺ Most of the config checks out: MySQL isn't exposed, the production PHP image
+  is stripped down, php.ini hardening and security headers are in place, and the
+  missing-key error is clear. I'm taking a closer look at the web image's build
+  context and the Node version before calling anything a finding. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && echo "== root .dockerignore?"; ls -a |
+      grep -i dockerignore || echo "none"; ls docker | grep -i ignore || echo
+      "no docker/*.docke…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && cat .dockerignore)
+  ⎿  (No output)
+
+⏺ The Docker build is clean, and the Node 20 used by the web image and CI has
+  reached end of life, so it no longer gets security fixes. Next I'm reviewing
+  the backend's security-relevant paths, including whether the EOA key could
+  leak into logs or errors. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge/backend && wc -l src/*.php src/*/*.php
+      public/index.php | sort -n | tail -30)
+  ⎿  (No output)
+
+  Read 8 files (ctrl+o to expand)
+
+⏺ The EOA client, error handling, CSRF guard and identity cookie check out, with
+  the key only sent in the request body and no leaks through logged traces.
+  Next I'm reviewing request parsing and the database and repository layers for
+  SQL injection and race conditions. · summary
+
+  Read 8 files (ctrl+o to expand)
+
+⏺ SQL looks clean: queries use prepared statements with emulation off, and the
+  dynamic IN list is built from placeholders. Next I'm reviewing the services,
+  where the business rules and transaction logic live. · summary
+
+  Read 4 files (ctrl+o to expand)
+
+⏺ The backend logic checks out: the daily limit is enforced by a database key
+  inside transactions, EOA writes have compensating undos, ownership is verified
+  server-side, and list syncs can't clobber in-flight adds. Next I'm checking
+  the frontend for patterns that could reopen XSS, and what the plan says about
+  how EOA keys relate to the game library. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && echo "== risky frontend patterns:"; grep
+      -rnE "dangerouslySetInnerHTML|innerHTML|eval\(|new
+      Function|target=\"_blank\"|localStora…)
+  ⎿  (No output)
+
+⏺ The frontend pattern search returned a false "none" because zsh expanded the
+  --include glob itself, so I'll re-run it. The plan also confirms each EOA key
+  has its own library, which matters for the README. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && grep -rnE
+      'dangerouslySetInnerHTML|innerHTML|eval\(|new
+      Function|_blank|document\.cookie|localStorage' frontend/src | grep -v
+      '\.…)
+  ⎿  (No output)
+
+⏺ The final review is complete. Nothing has been changed. The project is in good
+  shape: no secret has ever reached the repo, there are no known vulnerable
+  dependencies, and I found no security bugs in the code.
+
+  What I checked and found clean
+
+  Secrets (the hard requirement):
+  - .env has never been tracked.
+  - The current API key isn't in any commit, any branch, the working tree or the
+    AI logs.
+  - No key-shaped value was ever added to tracked files in history.
+  - There are no other credential patterns (GitHub tokens, AWS keys, private
+    keys) anywhere in history.
+  - The only key-shaped value in the logs is the deliberately fake test value,
+    sitting next to a [REDACTED_API_KEY] marker, which shows the redaction
+    works.
+
+  Dependencies: npm audit and composer audit both report 0 vulnerabilities.
+
+  Backend:
+  - Every SQL query is a native prepared statement.
+  - JSON-only request bodies, plus the CSRF guard (the custom header and an
+    Origin check).
+  - The identity cookie is HttpOnly, SameSite=Lax, and Secure behind HTTPS. Time
+    zones are validated against the list of real ones.
+  - The daily rule is enforced by a database key inside transactions, and every
+    EOA write has a compensating undo.
+  - Ownership is checked on the server.
+  - The API key is only sent in request bodies and never appears in error
+    messages or stack traces, since production PHP drops function arguments from
+    traces.
+
+  Frontend: no dangerouslySetInnerHTML, innerHTML, eval or cookie access, and
+  the built page has only one external script with no inline code, so the strict
+  CSP holds.
+
+  Infrastructure:
+  - MySQL isn't exposed on a port, and its root password is random.
+  - The production PHP image has no dev dependencies, tests or Composer.
+  - The PHP settings are hardened, the security headers are on every route, and
+    rate limits are in place.
+  - The root .dockerignore keeps .env and the logs out of the Docker build.
+
+  Findings
+
+  #: 1
+  Finding: Node 20 is end of life (since April 2026) in docker/web.Dockerfile
+  and
+    in CI. It's only used to build the static files, so the exposure is small,
+    but reviewers will notice it.
+  Severity: Low–medium
+  Recommendation: Move both to Node 24 LTS. That's three one-line changes, and
+  CI
+    confirms the build.
+  ────────────────────────────────────────
+  #: 2
+  Finding: Each EOA key has its own library, and keys expire daily. Generating a
+
+    new key starts with an empty library, and the app then clears its local
+  games
+     on the next refresh, because EOA is the system of record. This is correct
+    behavior, but a reviewer could easily be surprised by it.
+  Severity: Docs
+  Recommendation: Explain it in the README. A scripts/generate-key.sh that
+  writes
+    the key into .env without printing it would make the step reliable.
+  ────────────────────────────────────────
+  #: 3
+  Finding: nginx doesn't compress responses. The JS bundle is 235 KB
+    uncompressed, about 70 KB gzipped.
+  Severity: Low (performance)
+  Recommendation: Turn on gzip for static files only (JS, CSS, SVG, HTML).
+  That's
+    a few lines in nginx.conf.
+  ────────────────────────────────────────
+  #: 4
+  Finding: CI actions and base images use version tags rather than pinned SHAs
+  or
+    digests.
+  Severity: Informational
+  Recommendation: I'd leave it. Pinning hardens the supply chain but makes the
+    files harder to read. Mention it in the README as a production step.
+  ────────────────────────────────────────
+  #: 5
+  Finding: Outdated major versions: Guzzle 8, PHPUnit 12, PHPCS 4.
+  Severity: Informational
+  Recommendation: Hold. A major upgrade right before submission is risk without
+    benefit.
+
+  Accepted trade-offs for the README's "limitations" section: default database
+  credentials (local-only, not exposed), no HTTPS locally (HSTS belongs on a
+  real TLS front end), identity by cookie (clearing it gives a new user, bounded
+  by the rate limits), rate limits that are global when running locally, and
+  removal that calls EOA first, with any local leftover reconciled on the next
+  refresh.
+
+  Still open from earlier: the illustration's license. The repo is public, so
+  please confirm you're allowed to redistribute office-games.png. If it came
+  from a stock or illustration site, it may need an attribution line in the
+  README.
+
+  Proposed next step
+
+  1. A fix/final-review branch with #1 (Node 24) and #3 (gzip), with tests, a
+     Docker rebuild and a browser check. Committed locally, and you push.
+  2. Then docs/submission, covering #2, the limitations,
+     scripts/generate-key.sh, and the license note if needed.
+
+  Should I do both #1 and #3, or only #1?
+
+❯ Lets do both of these. After we create docs/submission. I am going to do a
+  careful review of all code. so we will want to wait before pushing to main
+
+⏺ I'll do both fixes on fix/final-review, then write the docs on
+  docs/submission. Everything gets committed locally on those branches and
+  nothing gets pushed or merged, so main waits for your review.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git checkout -q main && git checkout -q -b
+      fix/final-review && git branch --show-current && node -v && sed -n 55,70p
+      .github/work…)
+  ⎿  (No output)
+
+⏺ Your Mac's own Node is also 20.20.2. That doesn't affect the repo or Docker,
+  but you may want to upgrade it separately. Making the changes:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      def edit(p, pairs):…)
+  ⎿  (No output)
+
+⏺ I'm verifying it the way CI will: lint, tests and build under Node 24 in a
+  container, then the rebuilt web image and a browser pass. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker run --rm -v "$PWD/frontend":/src:ro
+      node:24-alpine sh -c 'cp -r /src /app 2>/dev/null; cd /app && rm -rf
+      node_modules dist…)
+  ⎿  (No output)
+  ⎿  (timeout 10m)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose up -d --build web 2>&1 |
+      tail -1 && until curl -sf http://localhost:8080/ >/dev/null; do sleep 1;
+      done; docker-com…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ Lint, all 74 tests and the build pass on Node 24, but the web container failed
+  to start because port 8080 is held by another process. I'm checking what's
+  using that port, since the header checks came from that process rather than
+  the new build. · summary
+
+⏺ Bash(docker ps --format 'table
+      {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}')
+  ⎿  (No output)
+
+⏺ Port 8080 is taken by your fresh-clone stack (eoa-fresh-*), which I'm leaving
+  running. I'll build the new web image and start it on port 8081 within this
+  project's network, so it can reach this project's PHP and database. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose build web 2>&1 | tail -1 &&
+      docker run -d --rm --name eoa-gzip-check --network eoa-challenge_default
+      -p 127.0.0.1:…)
+  ⎿  (No output)
+⏺ The config checks out: JS and CSS are gzipped with Vary: Accept-Encoding,
+  while the PNG, API and HTML are not (HTML falls under the 1 KB minimum), and
+  security and cache headers survive compression. I'm measuring the actual
+  saving and then running the browser check on port 8081. · summary
+
+⏺ Bash(B=http://localhost:8081; JS=$(curl -s $B/ | grep -o
+      '/assets/index-[^"]*\.js'); CSS=$(curl -s $B/ | grep -o
+      '/assets/index-[^"]*\.css'); for u in $JS $CSS; do p…)
+  ⎿  (No output)
+  ⎿  (timeout 3m)
+
+⏺ The JS dropped from 239 KB to 75 KB and the CSS from 17.8 KB to 4.7 KB, and
+  the browser check came back clean at all three widths. I'm removing the
+  temporary container and recording the review in PLAN.md next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker stop eoa-gzip-check >/dev/null &&
+      echo "temp container stopped"; python3 - <<'EOF'
+      p='PLAN.md'…)
+  ⎿  (No output)
+
+⏺ Committing on fix/final-review, local only:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add .github/workflows/ci.yml PLAN.md
+      docker frontend/.nvmrc && git commit -q -F - <<'EOF'
+      fix: move to Node 24 LTS and gzip s…)
+  ⎿  (No output)
+
+⏺ The fixes are committed on fix/final-review as 92b5306, with the AI log kept
+  separate. I'm branching docs/submission from there so the README reflects the
+  final state, and reading the plan sections it will draw on. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git checkout -q -b docs/submission && git
+      branch --show-current && ls README* 2>/dev/null; sed -n 1,102p PLAN.md)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n '/^## Observed API behavior/,/^##
+      Backend implementation notes/p' PLAN.md; sed -n '/^## Backend
+      implementation notes/,/^##…)
+  ⎿  (No output)
+
+⏺ The README will cover these sections. The plan's early "Write path" section
+  describes calling the API first and then committing, but the code claims
+  locally first, calls the API, and undoes the claim on failure; I'm checking
+  the remaining scripts next. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && head -20 scripts/scrub-transcript.sh; echo
+      ----; head -12 scripts/setup-hooks.sh; echo ----; cat
+      .claude/settings.json; echo ----…)
+  ⎿  (No output)
+
+⏺ Writing the key-generation helper first. It writes the key straight into .env
+  and never prints it, so it fits the secret-handling rules:
+
+⏺ Write(scripts/generate-key.sh)
+  ⎿  Wrote 36 lines to scripts/generate-key.sh
+       1 #!/usr/bin/env bash
+       2 # Generates an EOA API key and saves it to .env without printing
+          it.
+       3 # Creates .env from .env.example if needed. Safe to re-run: EOA
+         keys expire
+       4 # (roughly daily), and each key has its own, initially empty, ga
+         me library.
+       5 set -euo pipefail
+       6 cd "$(dirname "$0")/.."
+       7
+     … +29 lines (ctrl+o to expand)
+
+⏺ I'll test the change against a local fake API in a scratch copy, so your real
+  .env stays untouched and no live key gets generated, covering four cases.
+  · summary
+
+⏺ Bash(chmod +x ~/Websites/eoa-challenge/scripts/generate-key.sh;
+      S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/167
+      30bd4-8a39-42b0-8ee5-dd320d…)
+  ⎿  (No output)
+
+⏺ All five tests pass, and I'm fixing a likely bug where a missing trailing
+  newline in .env would merge the appended key into the last line. · summary
+
+⏺ Update(scripts/generate-key.sh)
+  ⎿  Added 2 lines
+      27    KEY="$key" awk '/^EOA_API_KEY=/ { print "EOA_API_KEY=" ENVIRO
+          N["KEY"]; next } { print }' .env > "$tmp"
+      28  else
+      29    cat .env > "$tmp"
+      30 +  # Start on a new line even if .env doesn't end with one.     
+      31 +  [ -s .env ] && [ -n "$(tail -c 1 .env)" ] && echo >> "$tmp"  
+      32    printf 'EOA_API_KEY=%s\n' "$key" >> "$tmp"
+      33  fi
+      34  mv "$tmp" .env
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/genkey; cp
+      ~/Websites/eoa-challenge/scrip…)
+  ⎿  (No output)
+
+⏺ All the edge cases pass. Next I'm pointing .env.example at the new script and
+  correcting the plan's outdated "Write path" section:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      def edit(p, pairs):…)
+  ⎿  (No output)
+
+⏺ Now the README. It's written for the EOA reviewers: how to run it first, then
+  the decisions they'll evaluate (the daily rule, the API usage, error handling
+  and AI use).
+
+⏺ Write(README.md)
+  ⎿  Wrote 305 lines to README.md
+       1 # Vote for Your Favorite Game
+       2
+       3 A full-stack app for the Essense of Australia code challenge: em
+         ployees
+       4 suggest games for the office library and vote for the ones they
+         want most.
+       5 Each person gets **one action per day**, either a vote or a new
+         suggestion,
+       6 measured in their own time zone.
+       7
+     … +298 lines (ctrl+o to expand)
+
+⏺ The README is done; I'm now checking its claims against the code, starting
+  with the docker compose file, the missing-key message, and the referenced
+  files and links. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker compose version 2>&1 | head -1;
+      docker compose config -q && echo "docker compose (v2) config: ok";
+      docker-compose config -…)
+  ⎿  (No output)
+
+⏺ Every check passed: both docker-compose and docker compose accept the file,
+  and the missing-key message matches the README. Next I'm adding a note that
+  the frontend tests need Node on the host and softening one AI-section sentence
+  that speaks in your voice. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='README.md'…)
+  ⎿  (No output)
+⏺ The final-review fixes are committed locally on fix/final-review. The
+  documentation is done on docs/submission but not committed, because parts of
+  the README speak in your voice and you should approve them first. Nothing has
+  been pushed or merged, and CLAUDE.md now records the hold on main.
+
+  fix/final-review (committed: 92b5306, plus the AI log)
+
+  - Node 24 LTS replaces the end-of-life Node 20 in the web image and CI, and a
+    new frontend/.nvmrc records it. Lint, all 74 tests and the build pass under
+    Node 24.
+  - Compression for static files only (new docker/static-gzip.conf). JS dropped
+    from 239 KB to 75 KB and CSS from 18 KB to 5 KB. API responses, the PNG and
+    the small HTML page aren't compressed, and the security headers are still on
+    compressed responses. In Chrome: zero axe violations at 3 widths, and no
+    CSP problems.
+  - PLAN.md has a new "Final review" section with what was checked, fixed and
+    deliberately left alone.
+
+  docs/submission (uncommitted, for your review)
+
+  - README.md (new), written for the EOA reviewers:
+    - Getting started: quick start, key handling (expiry, one library per key)
+      and the reset commands.
+    - Testing: how to try it as several users, plus the test commands.
+    - Design: how it works (data ownership, the daily rule, the write path,
+      duplicate titles, how the EOA API quirks are handled) and the frontend.
+    - Security and the key-protection measures.
+    - Wrap-up: project layout, limitations, future improvements, how AI was
+      used, and credits.
+    - Checked against the code: every command, file path, error message, number
+      and link. Both docker-compose and docker compose accept the file.
+  - scripts/generate-key.sh (new): creates .env if needed and saves a new key
+    without printing it. I tested it against a local fake of the API, never the
+    real one, covering a new .env, replacing a key, appending one, a file
+    without a trailing newline, an API error (.env left untouched) and an
+    unreachable host.
+  - .env.example: points to the script.
+  - PLAN.md: the early "Write path" section described the original sketch rather
+    than what was built. It's corrected now.
+  - CLAUDE.md: status brought up to date, including the hold on main.
+
+  Things for you to decide or check
+
+  1. The "How AI was used" section speaks for you: "Decisions were mine…" and "I
+     reviewed and approved the changes on each branch before they were
+     committed, and did every push and merge myself." Please check it's accurate
+     as you'd describe it.
+  2. The illustration credit is still missing. I left it out rather than guess.
+     Tell me its source and license and I'll add the line.
+  3. ai-logs/transcript.md is referenced in the README but won't exist until the
+     final /export at the very end.
+  4. Your fresh-clone stack (eoa-fresh-*) is still running and holding
+     port 8080. Stop it with cd ~/eoa-fresh && docker-compose down -v when
+     you're done with it. That also frees 8080 for this project's stack.
+
+  Once you've reviewed the README, tell me what to change, or tell me to commit
+  docs/submission.
+
+❯ before we proceed I would like to bring down the local docker server and
+  bring it up with the newest code.
+
+⏺ The fresh-clone stack (eoa-fresh) is holding port 8080, so I'll stop it too.
+  I'll keep its data volume, so nothing is deleted. Then I'll rebuild this
+  project's stack from the current code: docs/submission, which includes the
+  Node 24 and compression changes.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current && docker
+      compose -p eoa-fresh down 2>&1 | tail -2; docker-compose down 2>&1 | tail
+      -1; docker ps --for…)
+  ⎿  (No output)
+  ⎿  (timeout 10m)
+
+⏺ The stack is running the newest code at http://localhost:8080.
+
+  - Fresh-clone stack (eoa-fresh): stopped and removed, but its database volume
+    is kept. To delete that data later, run docker volume rm eoa-fresh_db-data,
+    or docker-compose down -v from the clone's folder.
+  - This project's stack: stopped, then rebuilt from docs/submission, so it
+    includes Node 24 and the compression change.
+  - Status: web, php and db are up with the database healthy, /api/health is ok,
+    and the JS is served gzipped.
+  - Data: the 11 games from earlier are still there, because the local database
+    volume was kept, and the API key in .env is still valid.
+
+  The docs/submission changes (README, scripts/generate-key.sh, docs) are still
+  uncommitted for your review. They don't affect the running app.
+
+❯ OK that looked good. we need to push up the fix-final-review branch to github
+  and merge it into main. please give me the code
+
+⏺ Here are the commands. Run them from the repo root.
+
+  Your working copy is on docs/submission with the uncommitted README and docs.
+  Git won't let you switch to main with those changes present, because PLAN.md
+  differs between the branches. So the first step commits the live AI log and
+  puts the docs work aside, and the last step brings it back.
+
+  cd ~/Websites/eoa-challenge
+
+  # 1. Commit the live AI log, then set the docs work aside (README,
+  #    generate-key.sh, PLAN/CLAUDE/.env.example edits). -u includes the new
+  #    untracked files; .env is gitignored, so it stays where it is.
+  git add ai-logs && git commit -m "chore: update AI session log"
+  git stash push -u -m "docs-submission-wip"
+  git status --short                 # should print nothing
+
+  # 2. Push the fix branch, then wait for all five CI jobs to go green
+  #    (GitHub → Actions; CI now runs on every branch push)
+  git push -u origin fix/final-review
+
+  # 3. Merge into main and push
+  git checkout main
+  git pull
+  git merge --no-ff fix/final-review
+  #    If it stops on the AI log only, keep the branch's (newer) copy:
+  #      git checkout --theirs ai-logs/session-2026-11-11-16730bd4.md
+  #      git add ai-logs && git commit --no-edit
+  git push
+
+  # 4. Go back to the docs branch and restore the work in progress
+  git checkout docs/submission
+  git stash pop
+  git status --short                 # README.md, scripts/generate-key.sh, etc.
+
+  - Step 1 commits the AI log onto docs/submission, not onto fix/final-review.
+    That's fine, because docs/submission builds on fix/final-review and will
+    bring the newer log in when it's merged later.
+  - Step 2: watch the frontend and Docker jobs. They're the first CI runs on
+    Node 24.
+  - Step 3: if any file other than the AI log conflicts, stop and send me the
+    output.
+  - Step 4: if stash pop reports a conflict, don't drop the stash. Send me the
+    output and we'll sort it out. Your changes stay safe in git stash list until
+    it's resolved.
+
+  After this, main has the final-review fixes, and docs/submission holds only
+  the docs changes for your review.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/.env in the IDE. This may or may
+  not be related to the current task.</ide_opened_file>
+
+❯ I tried running the the quick start but the generate key script did not run.
+  should we push this first to test that?
+
+⏺ The script isn't on GitHub yet, so that's expected. It exists only as an
+  uncommitted file on docs/submission, and if you've already run step 1 of my
+  last instructions, it's sitting in the stash right now. Checking where things
+  stand:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current; git status
+      --short; git stash list; git log --oneline -3; ls -la
+      scripts/generate-key.sh 2>&1 | tail -…)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git fetch -q origin && echo "local main:";
+      git log --oneline -1 main; echo "origin/main:"; git log --oneline -1
+      origin/main; git…)
+  ⎿  (No output)
+
+⏺ Here's where things stand:
+  - fix/final-review is merged and pushed: origin/main is at cbe84b5.
+  - The docs work isn't stashed: you're on docs/submission with all the changes
+    still in place, so step 1 of my earlier instructions wasn't needed in the
+    end.
+  - scripts/generate-key.sh exists only in your local working copy. It has never
+    been committed or pushed, so any fresh clone from GitHub doesn't have it.
+    That's why the quick start failed.
+
+  So yes: to test the quick start for real, docs/submission has to be committed
+  and pushed. That's safe, because pushing a branch doesn't touch main, and you
+  can still review the README. Any edits become follow-up commits on the same
+  branch before it's merged.
+
+  Steps:
+  1. I commit docs/submission locally: the README, the script, and the
+     .env.example, PLAN.md and CLAUDE.md updates. The AI log goes in a separate
+     commit.
+  2. You push the branch only:
+  git push -u origin docs/submission
+  3. You test it from a fresh clone of that branch, following only the README:
+  cd ~ && rm -rf ~/eoa-fresh
+  git clone -b docs/submission https://github.com/tschappaugh/eoa-challenge.git
+  ~/eoa-fresh
+  cd ~/eoa-fresh
+  ./scripts/generate-key.sh
+  docker-compose up --build
+     Port 8080 is in use by this project's stack again, so run docker-compose
+     down in ~/Websites/eoa-challenge first. Clean up afterward with
+     docker-compose down -v in the clone.
+
+  One caution about the key: running the script in the clone creates a new key
+  with its own empty library. That doesn't affect your main project, which keeps
+  its own .env and key, unless you copy the new key over.
+
+  .env is open in your editor again. Close the tab when you can, so its contents
+  don't end up pasted or exported by accident.
+
+  Should I make the commit in step 1 now?
+
+❯ yes
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add README.md scripts/generate-key.sh
+      .env.example PLAN.md CLAUDE.md && git diff --cached --name-status && git
+      ls-files -s sc…)
+  ⎿  (No output)
+
+⏺ I committed the docs on docs/submission as 0d34baa, and the AI session log is
+  in its own commit, 89afc83. The pre-commit secret check passed, the script is
+  stored as executable (100755, so ./scripts/generate-key.sh runs straight from
+  a clone), and the working tree is clean. Nothing has been pushed.
+
+  Your steps:
+
+  # Push the branch only (main is untouched)
+  cd ~/Websites/eoa-challenge
+  git push -u origin docs/submission
+
+  # Free port 8080
+  docker-compose down
+
+  # Fresh clone of the branch, following only the README
+  cd ~ && rm -rf ~/eoa-fresh
+  git clone -b docs/submission https://github.com/tschappaugh/eoa-challenge.git
+  ~/eoa-fresh
+  cd ~/eoa-fresh
+  ./scripts/generate-key.sh
+  docker-compose up --build
+
+  Then check http://localhost:8080. If something in the README is unclear or
+  wrong while you follow it, note it, because that's exactly what this test is
+  for.
+
+  When you're done:
+
+  cd ~/eoa-fresh && docker-compose down -v
+  cd ~/Websites/eoa-challenge && docker-compose up -d
+
+  The push also runs CI on docs/submission. None of the code changed, but it's a
+  useful final confirmation.
+
+❯ I ran this in a separate directory and used terminal. It worked as we
+  described.
+
+⏺ That confirms the quick start: a fresh clone of docs/submission runs by
+  following only the README.
+
+  Remaining before you ship:
+  1. Your code review. main stays on hold until you're done. Anything you find
+     becomes a follow-up commit on docs/submission, or on a new fix branch if
+     it's code.
+  2. The illustration credit. Tell me where office-games.png came from and its
+     license, and I'll add the line to the README's Credits section.
+  3. Merge docs/submission into main after your review, with the same script as
+     before.
+  4. The final transcript, last of all:
+     - Run /export in this session to ai-logs/transcript.md.
+     - Then run scripts/scrub-transcript.sh ai-logs/transcript.md.
+     - I'll search it for the key before you commit it.
+     - Commit it with the final AI log, push, and confirm CI is green on main.
+  5. A last look at the public repo in a private window, to see exactly what
+     reviewers will see.
+
+  If your test clone in the other folder is still running, docker-compose down
+  -v there will clean it up. Then docker-compose up -d in
+  ~/Websites/eoa-challenge brings your main stack back on port 8080.
+
+  Let me know when your review is done or if you have questions about any part
+  of the code.
+
+❯ I want to review the files and structure one last time before we push the
+  final.
+
+⏺ To guide your review, here's the full list of tracked files on
+  docs/submission:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current && git status
+      --short | head -3; git ls-files | grep -v '^frontend/src/.*\.test\.tsx\?$'
+      | awk -F/ '{pr…)
+  ⎿  (No output)
+
+⏺ There are 113 tracked files. Below is the repo structure grouped in the order
+  I'd review it, with what to look for in each group. I'm flagging one item I
+  noticed while listing.
+
+  Suggested review order
+
+  1. What reviewers see first
+  - README.md: read it as an outsider. Make sure it's accurate and in your
+    voice, especially "How AI was used".
+  - .env.example, docker-compose.yml, scripts/generate-key.sh: the quick-start
+    path you just tested.
+
+  2. Backend: backend/
+
+  Area: Entry and wiring
+  Files: public/index.php, src/AppFactory.php, src/Services.php, src/Config.php,
+
+    src/Database.php, src/Db.php, src/Json.php
+  Look for: Startup, error handling, JSON responses
+  ────────────────────────────────────────
+  Area: HTTP layer
+  Files: src/Http/Routes.php, IdentityMiddleware.php, Identity.php,
+    RequestGuardMiddleware.php, ApiErrorMiddleware.php
+  Look for: Endpoints, cookie identity, CSRF guard
+  ────────────────────────────────────────
+  Area: Business rules
+  Files: src/Service/GameService.php, VoteService.php, DailyLimitService.php
+  Look for: The daily rule, refunds, ownership, write path and undo. This is the
+
+    heart of the evaluation.
+  ────────────────────────────────────────
+  Area: Domain
+  Files: src/Domain/Title.php, Clock.php, User.php,
+    src/Exception/ApiException.php
+  Look for: Title rules and folding, local-day math, error codes
+  ────────────────────────────────────────
+  Area: Data
+  Files: src/Repository/*.php, migrations/001_init.sql,
+    migrations/002_test_database.sh
+  Look for: SQL and schema. The second file creates the test database in the
+  same
+    MySQL container.
+  ────────────────────────────────────────
+  Area: EOA client
+  Files: src/Eoa/GuzzleEoaClient.php, EoaApi.php, UpstreamUnavailable.php
+  Look for: How the API quirks are handled
+  ────────────────────────────────────────
+  Area: Tests
+  Files: tests/*.php, tests/Support/FakeEoa.php, DatabaseTestCase.php
+  Look for: 86 tests. FakeEoa mimics the real API's behavior.
+  ────────────────────────────────────────
+  Area: Tooling
+  Files: Dockerfile, docker/php.ini, php-dev.ini, composer.json, phpcs.xml,
+    phpstan.neon, phpunit.xml
+  Look for: Build stages, production settings
+
+  3. Frontend: frontend/src/
+
+  ┌─────────────┬───────────────────────────────────────────────────────────┐
+  │    Area     │                           Files                           │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │ Page shell  │ main.tsx, App.tsx, index.css (theme tokens), index.html   │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │             │ hooks/useGameLibrary.ts (the most complex file:           │
+  │ State       │ optimistic updates, rollback, stale-fetch guards),        │
+  │             │ hooks/useNow.ts                                           │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │             │ components/GameList.tsx, GameItem.tsx, SortControls.tsx,  │
+  │ Components  │ AddGameForm.tsx, ConfirmDialog.tsx, LimitBanner.tsx,      │
+  │             │ ErrorAlert.tsx, StatusRegion.tsx, styles.ts               │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │ Logic       │ lib/api.ts, lib/sort.ts, lib/title.ts, lib/time.ts,       │
+  │             │ lib/messages.ts, lib/types.ts                             │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │ Tests       │ App.test.tsx, lib/*.test.ts, test/fakeServer.ts,          │
+  │             │ test-setup.ts (74 tests)                                  │
+  ├─────────────┼───────────────────────────────────────────────────────────┤
+  │ Assets and  │ assets/office-games.png, public/favicon.svg,              │
+  │ config      │ package.json, vite.config.ts, tsconfig*.json,             │
+  │             │ .oxlintrc.json, .prettierrc, .nvmrc                       │
+  └─────────────┴───────────────────────────────────────────────────────────┘
+
+  4. Infrastructure: docker/nginx.conf, security-headers.conf, static-gzip.conf,
+  web.Dockerfile, .dockerignore, .github/workflows/ci.yml, .gitleaks.toml
+
+  5. AI tooling and secret safeguards: .claude/settings.json,
+  .claude/hooks/log-ai.sh, scripts/redact.sh, scrub-transcript.sh,
+  test-redact.sh, git-hooks/pre-commit, setup-hooks.sh, probe-api.sh, ai-logs/
+
+  6. Project docs: PLAN.md (the full decision record) and CLAUDE.md (the AI's
+  working instructions; reviewers may find it interesting)
+
+  Things I noticed
+
+  - frontend/public/favicon.svg is still Vite's default purple logo. That's the
+    browser tab icon, and reviewers will see it. I'd replace it with a simple
+    neutral icon, for example a game controller in the site's ink color, or
+    remove it. It's a small change.
+  - CLAUDE.md has a "Hold: don't merge or push" status line. I'll update it to
+    "done" as part of the final wrap-up, so it doesn't look stale in the
+    submitted repo.
+  - Your working tree shows only the live AI log as changed, which is expected.
+
+  To read the code easily in VS Code: the Explorer panel follows this structure,
+  and Cmd+P opens files by name. If you'd like, I can walk through any file or
+  area with you, such as how a vote flows from the button click through to the
+  database and the EOA API. Note anything you'd like changed, and I'll collect
+  it into one follow-up commit.
+
+❯ Can you create a checkmark in the site colors for the favicon?
+
+⏺ I'll make it match the "voted" button state: the same checkmark in cream
+  (#f8f6f2, the page color) on the ink background (#2d2d2d), so the tab icon
+  echoes the app's main action. I'm writing it at a 32-unit grid with a heavier
+  stroke so it stays legible at 16px:
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current && cat
+      frontend/public/favicon.svg | head -c 120; echo; grep -n favicon
+      frontend/index.html)
+  ⎿  (No output)
+
+⏺ Write(frontend/public/favicon.svg)
+  ⎿  Added 4 lines, removed 1 line
+      1 -<svg xmlns="http://www.w3.org/2000/svg" width="48" height="46" f
+        -ill="none" viewBox="0 0 48 46"><path fill="#863bff" d="M25.946 4
+        -4.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.26
+        -2-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.49
+        -7 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.4
+        -74c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-
+        -7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 
+        -1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(disp
+        -lay-p3 .5252 .23 1);fill-opacity:1"/><mask id="a" width="48" hei
+        -ght="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type
+        -:alpha"><path fill="#000" d="M25.842 44.938c-.664.844-2.021.375-
+        -2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.45
+        -6-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.13
+        -3c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.47
+        -4h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.
+        -578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z
+        -" style="fill:#000;fill-opacity:1"/></mask><g mask="url(#a)"><g 
+        -filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#ede6ff" 
+        -rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3
+        - .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.0
+        -0324 -4.47 31.516)"/></g><g filter="url(#c)"><ellipse cx="10.399
+        -" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill
+        -:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" tr
+        -ansform="matrix(.00324 1 1 -.00324 -39.328 7.883)"/></g><g filte
+        -r="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#7e14ff" rx="5
+        -.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .492
+        -2 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.
+        -639)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy
+        -="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e1
+        -4ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transfo
+        -rm="rotate(89.814 -32.644 -3.334)scale(1 -1)"/></g><g filter="ur
+        -l(#f)"><ellipse  … [+7522 chars]                                
+      1   No newline at end of file
+      2 +<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">    
+      3 +  <rect width="32" height="32" rx="6" fill="#2d2d2d"/>          
+      4 +  <path d="M8.5 16.5l5 5L23.5 11" fill="none" stroke="#f8f6f2" s
+        +troke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+        +/>                                                              
+      5 +</svg>                                                          
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cp
+      ~/Websites/eoa-challenge/frontend…)
+  ⎿  (No output)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The preview didn't load: Chrome blocks file:// images on an in-memory page, so
+  this is a harness problem, not the icon. Re-rendering with the SVG embedded
+  directly:
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cd $S && sed -i ''
+      's#const img = (s…)
+  ⎿  (No output)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ It reads clearly at 16, 32 and 64px on a light tab bar. The dark-tab row was
+  cut off, so I'm re-rendering with a taller viewport to check it:
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-tonyschappaugh-Websites-eoa-challenge/16
+      730bd4-8a39-42b0-8ee5-dd320d5640b3/scratchpad/e2e; cd $S && sed -i ''
+      's/height: 130/he…)
+  ⎿  (No output)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The checkmark stays crisp on a dark tab bar, so the icon works on both
+  backgrounds. I'm rebuilding the web container so you can check it in your
+  browser. · summary
+
+⏺ Bash(cd ~/Websites/eoa-challenge && docker-compose up -d --build web 2>&1 |
+      tail -1; until curl -sf http://localhost:8080/ >/dev/null; do sleep 1;
+      done; curl -s -D -…)
+  ⎿  (No output)
+  ⎿  (timeout 5m)
+
+⏺ The new favicon is in place and served at http://localhost:8080. It's not
+  committed yet.
+
+  Design: a cream checkmark (#f8f6f2, the page background color) on a rounded
+  ink square (#2d2d2d, the text and button color). It's the same mark as the
+  "Vote" button once you've voted, so the tab icon matches the app's main
+  action. It's a 32-unit grid with a heavy, rounded stroke so it stays legible
+  at 16px, and it's 0.3 KB.
+
+  Checked:
+  - In real Chrome: it renders cleanly at 16, 32 and 64px on both light and dark
+    tab bars. On dark tabs the square mostly blends in, but the checkmark stays
+    crisp.
+  - Served by nginx: as image/svg+xml with no-cache.
+
+  Browsers cache favicons aggressively. If the tab still shows the old purple
+  icon, do a hard reload (Cmd+Shift+R) or open the page in a private window.
+
+  The only changed file is frontend/public/favicon.svg. Tell me if you'd like a
+  different look, such as a tan background (#6f5b3e) or no background square.
+  When you're happy with it, I'll commit it on docs/submission (chore: replace
+  default Vite favicon with a checkmark), along with any other changes from your
+  review.
+
+❯ That looks ok.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git add frontend/public/favicon.svg && git
+      commit -q -F - <<'EOF'
+      chore: replace default Vite favicon with a checkmark…)
+  ⎿  (No output)
+
+⏺ I committed the favicon on docs/submission as 302dbee, and the AI log is in
+  its own commit, c9988e6. The working tree is clean and nothing has been
+  pushed.
+
+  To publish it with the branch, run:
+  git push
+  The branch already tracks origin/docs/submission, so a plain git push is
+  enough. main is untouched.
+
+  When you've finished your review, tell me about anything else to change.
+  Otherwise the remaining steps are:
+  1. The illustration credit: tell me its source and license.
+  2. Merge docs/submission into main.
+  3. The final transcript: export it, scrub it, check it for the key and commit
+     it, then do the final push and a CI check.
+  4. A look at the public repo in a private window.
+
+❯ Here is the credit: <a href="https://unsplash.com/illustrations/retro-gaming-
+  setup-with-lava-lamps-and-joysticks-tu8UHcHumDA?utm_source=unsplash&utm_mediu
+  m=referral&utm_content=creditCopyText">Illustration</a> by <a
+  href="https://unsplash.com/@masantocreative/illustrations?utm_source=unsplash
+  &utm_medium=referral&utm_content=creditCopyText">Masantocreative</a> on <a
+  href="https://unsplash.com/illustrations?utm_source=unsplash&utm_medium=refer
+  ral&utm_content=creditCopyText">Unsplash</a>
+
+⏺ Adding it to the README's Credits section. I'm keeping the links exactly as
+  Unsplash supplied them, tracking parameters included, since that's the form
+  they ask for:
+
+⏺ Update(README.md)
+  ⎿  Added 4 lines
+      304  
+      305  - [Montserrat](https://github.com/JulietaUla/Montserrat) by Ju
+           lieta Ulanovsky
+      306    and contributors, SIL Open Font License 1.1, bundled via Fon
+           tsource.
+      307 +- [Illustration](https://unsplash.com/illustrations/retro-gami
+          +ng-setup-with-lava-lamps-and-joysticks-tu8UHcHumDA?utm_source=
+          +unsplash&utm_medium=referral&utm_content=creditCopyText)      
+      308 +  by [Masantocreative](https://unsplash.com/@masantocreative/i
+          +llustrations?utm_source=unsplash&utm_medium=referral&utm_conte
+          +nt=creditCopyText)                                            
+      309 +  on [Unsplash](https://unsplash.com/illustrations?utm_source=
+          +unsplash&utm_medium=referral&utm_content=creditCopyText),     
+      310 +  used under the Unsplash License.                            
+
+⏺ Bash(cd ~/Websites/eoa-challenge && sed -n '/^## Credits/,$p' README.md && git
+      add README.md && git commit -q -F - <<'EOF'
+      docs: credit the intro illustration…)
+  ⎿  (No output)
+
+⏺ I added the credit to the README's Credits section and committed it on
+  docs/submission as 07827ef, with the AI log in its own commit, 6e248b0.
+  Nothing has been pushed.
+
+  How it renders: "Illustration by Masantocreative on Unsplash, used under the
+  Unsplash License", with each name linked exactly as Unsplash gave it. The
+  Unsplash License allows free use, including in a public repo. Attribution
+  isn't required, but it's good practice.
+
+  To publish:
+  git push
+
+  What's left:
+  1. Your review: tell me about anything else to change.
+  2. Merge docs/submission into main when you're satisfied. I'll give you the
+     commands.
+  3. The final transcript and push come last. Before that, I'll update
+     CLAUDE.md's "Hold" status to "done" so the submitted repo doesn't look
+     unfinished.
+
+❯ I would like to spend the next hour of so reviewing the repo. Could you walk
+  me through on a overview of what we are shipping and then i can drill down on
+  individual files as we go.
+
+⏺ Here's the overview, from the big picture down to how the pieces connect.
+  After it is a menu of places to drill into.
+
+  1. What we're shipping
+
+  A Dockerized full-stack app, where docker-compose up starts three containers:
+
+  Browser ──▶ web (nginx) ──/api──▶ php (PHP-FPM + Slim 4) ──▶ EOA REST API
+                │                          │
+          serves the built            db (MySQL 8.4)
+          React app
+
+  Along with the app itself, the submission includes the tests, the CI pipeline,
+  the README and PLAN.md, the AI session log, and the safeguards that kept the
+  API key out of everything.
+
+  The core design idea: two sources of truth, each owning what it can know.
+  - The EOA API owns which games exist and their vote counts. It's anonymous: it
+    doesn't know who did what.
+  - MySQL owns identity and history: who voted for what, who added what, and who
+    has used today's action. It also holds the duplicate-title index.
+
+  Every page load merges the two. The list comes from EOA, enriched with "did I
+  vote for this?" and "can I remove this?" from MySQL.
+
+  2. Following one vote end to end
+
+  This path touches most of the important files, so it's the best way to see how
+  they fit together.
+
+  1. Click (frontend). GameItem.tsx calls vote() in hooks/useGameLibrary.ts. The
+     hook immediately shows the vote (optimistic update) and marks the game as
+     pending, then calls lib/api.ts. That sends POST /api/games/7/vote with the
+     X-Requested-With and X-Timezone headers and the cookie.
+  2. nginx (docker/nginx.conf) applies the rate limits and security headers,
+     then passes the request to PHP.
+  3. Middleware, outermost first (backend/src/Http/):
+     - IdentityMiddleware reads the uid cookie and builds an Identity. A user is
+       created only when a write needs one, and the time zone is locked at that
+       point.
+     - ApiErrorMiddleware catches business errors and turns them into the
+       standard JSON error shape.
+     - RequestGuardMiddleware is the CSRF check: the custom header is required,
+       and the Origin must match.
+  4. Route. Routes.php validates the id, then calls VoteService::vote().
+  5. Business rule. Service/VoteService.php, in one transaction, inserts today's
+     row into daily_actions, where the (user, day) primary key enforces the
+     one-action rule, and inserts into votes, whose primary key stops double
+     votes.
+  6. Upstream. Eoa/GuzzleEoaClient.php posts to EOA and checks the response
+     body, because EOA returns HTTP 200 even for failures. If EOA fails, the
+     service undoes the local claim and returns a friendly 502.
+  7. Response. On success the frontend announces "Voted for X." and quietly
+     re-fetches to reconcile. On failure it rolls back only that game and shows
+     the error in words.
+
+  Add and remove follow the same pattern. Removal is the exception: it calls EOA
+  first and refunds today's actions to anyone affected.
+
+  3. Backend map (backend/src, about 1,800 lines)
+
+  ┌──────────────────────────────┬──────────────────────────────────────────┐
+  │            Layer             │              Responsibility              │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │ AppFactory, Services,        │ Wiring: builds the app, its dependencies │
+  │ Config, public/index.php     │  and error handling                      │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │ Http/                        │ Routes plus three middleware classes:    │
+  │                              │ identity, errors, CSRF                   │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │                              │ The rules: GameService (list sync, add,  │
+  │ Service/                     │ remove, refunds), VoteService,           │
+  │                              │ DailyLimitService (the /api/me status)   │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │ Repository/                  │ All SQL, as prepared statements, one     │
+  │                              │ class per table                          │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │                              │ Title (cleaning, duplicate key,          │
+  │ Domain/                      │ punctuation folding), Clock (local day   │
+  │                              │ and midnight per time zone), User        │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │ Eoa/                         │ The API client and its interface, so     │
+  │                              │ tests can swap in FakeEoa                │
+  ├──────────────────────────────┼──────────────────────────────────────────┤
+  │ Exception/ApiException       │ Every error code, status and user-facing │
+  │                              │  message, in one place                   │
+  └──────────────────────────────┴──────────────────────────────────────────┘
+
+  Tests (backend/tests, 86): unit tests for Title, Clock and the client,
+  database-backed tests against real MySQL for the rules, refunds and failure
+  paths, and HTTP tests for cookies, CSRF and the error shape.
+
+  4. Frontend map (frontend/src)
+
+  Area: hooks/useGameLibrary.ts
+  Responsibility: All state: loading, optimistic writes with rollback, guards
+    against stale responses, the midnight re-check. It's the most intricate
+  file,
+     and both review rounds focused on it.
+  ────────────────────────────────────────
+  Area: components/
+  Responsibility: GameList (sorting, the remove dialog, focus management),
+    GameItem, SortControls, AddGameForm, ConfirmDialog (native <dialog>),
+    LimitBanner, ErrorAlert, StatusRegion (screen-reader announcements)
+  ────────────────────────────────────────
+  Area: lib/
+  Responsibility: Pure logic with no React: the api client, sort, title (mirrors
+
+    the backend rules), time, messages (error wording)
+  ────────────────────────────────────────
+  Area: App.tsx, index.css
+  Responsibility: Page layout, intro, header, theme tokens
+
+  Tests (74): mostly full-app tests against test/fakeServer.ts, which uses the
+  real fetch client and the real hook, plus axe accessibility checks, with unit
+  tests for the lib/ modules.
+
+  5. Infrastructure and safeguards
+
+  - Docker: a multi-stage PHP image (the runtime image has no dev tools), and a
+    web image that builds React with Node 24 and serves it with nginx.
+  - nginx: CSP and security headers, rate limits, compression for static files,
+    and long-term caching for hashed assets.
+  - CI (.github/workflows/ci.yml): five jobs on every push: backend, frontend,
+    Docker build, gitleaks and dependency audits.
+  - Key protection: .env is gitignored, and there's a pre-commit hook, gitleaks
+    in CI, and redaction in the AI logging hook and the transcript scrubber.
+
+  6. Documentation and AI tooling
+
+  - README.md: for reviewers. How to run it, how it works, the trade-offs, and
+    how AI was used.
+  - PLAN.md: the full decision record: the original plan, the API probe
+    findings, the hardening table, and the review notes.
+  - CLAUDE.md: the working instructions the AI followed.
+  - AI logging: .claude/ holds the logging hook, and ai-logs/ holds the live
+    session log, with the final transcript still to come.
+
+  Where to drill down
+
+  Some suggested starting points, depending on your goal:
+  - "Is the daily rule right?": Service/VoteService.php and GameService.php,
+    with migrations/001_init.sql.
+  - "How does the UI stay consistent?": hooks/useGameLibrary.ts.
+  - "Is it secure?": the Http/ middleware, docker/security-headers.conf and
+    docker/nginx.conf.
+  - "How were the EOA API quirks handled?": Eoa/GuzzleEoaClient.php alongside
+    PLAN.md's "Observed API behavior" table.
+  - "Are the tests meaningful?": tests/Support/FakeEoa.php, then
+    GameServiceTest.php.
+
+  Open any file and ask me about it. I'll explain what it does, why it's built
+  that way, and anything you might want to change. I'll keep a running list of
+  change requests so we can make them together at the end.
+
+❯ <ide_opened_file>The user opened the file /Users/tonyschappaugh/Websites/eoa-
+  challenge/backend/src/Service/GameService.php in the IDE. This may or may not
+  be related to the current task.</ide_opened_file>
+
+❯ lets start with backend/src/Service/GameService.php. Explain what each
+  section does
+
+⏺ GameService.php (backend/src/Service/GameService.php) owns games: listing
+  them, adding, removing, and keeping the local mirror in step with EOA. Here it
+  is section by section.
+
+  Header and class comment (lines 1–23)
+
+  Lines 1–18 are standard: strict types, namespace and imports. The class
+  comment at lines 20–23 states the pattern every write in the app follows:
+
+  ▎ claim locally (atomically), call the EOA API, and undo the local claim if
+  ▎ the API call fails.
+
+  Constructor (lines 26–34)
+
+  The service receives everything it uses: the PDO connection (for
+  transactions), the EOA client (an interface, so tests inject FakeEoa), the
+  Clock (so tests can fix "now"), and three repositories. It never creates its
+  own dependencies, which is why it can be tested against a real database with a
+  fake upstream. Services.php does the wiring.
+
+  list(): the game list (lines 47–76)
+
+  This runs on every GET /api/games.
+
+  1. Lines 49–53: fetch the list from EOA. An upstream failure becomes a
+     friendly 502 UPSTREAM_UNAVAILABLE, and the technical cause is logged, never
+     shown.
+  2. Line 55: sync() brings the local mirror in step with upstream (explained
+     below) and returns local rows keyed by EOA id.
+  3. Line 56: loads the ids of games this user has voted for, as a lookup set.
+     An anonymous visitor gets an empty set.
+  4. Lines 58–71: builds each item by merging the two sources:
+     - id and title come from our row. The local id is what the frontend uses,
+       and our title is the cleaned, decoded one.
+     - votes comes from EOA, clamped with max(0, …) as a safety net.
+     - votedByMe and canRemove come from our ledger and ownership. They're
+       computed per user, which is why API responses are no-store.
+     - Line 61: an upstream game with no local row is skipped. That's only an
+       in-flight add, which appears once it's finalized.
+  5. Line 73: sorts by votes descending, then by local id. EOA returns the list
+     unsorted. The tie-break is the one we changed so the frontend's optimistic
+     re-sort matches exactly.
+
+  add(): suggest a game (lines 81–119)
+
+  This is the most careful method in the file.
+
+  1. Lines 83–85: validate and clean the title (empty, over 100 characters or
+     not text is rejected with a 422), compute the duplicate key, and get the
+     user's local date.
+  2. Lines 89–95: the claim, in one transaction.
+     - Insert today's daily_actions row. If it already exists, the (user, date)
+       primary key rejects it, and we throw a 429 with Retry-After (line 91).
+     - Reserve the title by inserting a games row with no EOA id yet. If the
+       normalized title already exists, the unique index rejects it with 409
+       DUPLICATE_TITLE.
+     - Both succeed or neither does. A duplicate never burns the daily action,
+       and a used-up day never reserves a title. Doing this in the database
+       rather than with "check, then write" is what makes it safe when two
+       requests arrive at once.
+  3. Lines 97–102: call EOA. On failure, undoAdd() releases both the title and
+     the action, so the user can try again.
+  4. Lines 104–116: finalize locally: attach the EOA id and point today's action
+     at the new game. If that fails after EOA already created the game, we
+     compensate upstream by removing the game we just added. That's best effort;
+     if it fails too, the next list sync cleans up. Then the local claim is
+     undone and the original error re-thrown.
+  5. Line 118: returns the new game in the same shape the list uses, so the
+     frontend can insert it directly.
+
+  remove(): remove a game (lines 122–158)
+
+  1. Lines 124–136: the checks.
+     - Not found, or still being added: 404.
+     - Imported from outside the app (no owner): 403, with an explanation.
+     - Anyone but the creator: 403 NOT_OWNER.
+
+     Ownership is enforced here, not just hidden in the UI.
+  2. Lines 138–143: upstream first. This is the one write that calls EOA before
+     touching local data. If EOA fails, nothing local has changed, so there's
+     nothing to undo. A false result means "already gone upstream", and cleaning
+     up locally is still correct.
+  3. Lines 145–157: refunds and deletion, in one transaction.
+     - Lines 147–151: every voter who cast their vote today, in their own time
+       zone, gets their action back. They lost it through no fault of their own.
+     - Line 154: the creator gets their action back too, if they added the game
+       today.
+     - releaseIf() only deletes an action row matching exactly that type and
+       game, so it can't refund something else.
+     - Line 156: deleting the game also removes its votes, via the cascading
+       foreign key.
+
+  undoAdd() (lines 160–166)
+
+  The rollback helper for add(). In one transaction it deletes the reserved game
+  row and releases today's action.
+
+  sync(): keeping the mirror honest (lines 175–204)
+
+  This is called by list().
+
+  1. Lines 177–178: purge. Delete local games EOA no longer has. The repository
+     ignores rows younger than 60 seconds, so a game added a moment ago can't be
+     deleted by a list fetched just before it existed.
+  2. Lines 180–181: load the synced local rows, and the titles of adds still in
+     flight.
+  3. Lines 184–201: import games that exist upstream but not locally, such as
+     ones added through EOA's "Try it" form:
+     - Line 190: EOA stores names HTML-escaped (&amp;), so they're decoded and
+       cleaned. They're never rendered as HTML.
+     - Line 191: a blank name becomes "Untitled game", and long names are cut to
+       100 characters.
+     - Lines 195–197: skip it if it's our own in-flight add, which finalize will
+       attach.
+     - Line 199: import with no owner, so nobody can remove it here. If its
+       title duplicates an existing one (EOA allows duplicates), the repository
+       adds a #<id> suffix to the duplicate key so both are shown.
+  4. Line 203: re-read only if something was imported.
+
+  Worth knowing as a reviewer
+
+  - GET /api/games writes to the database through sync(). Strictly, a GET with
+    side effects is a design smell. Here the writes are idempotent mirror
+    maintenance, not user actions. The alternative, a background sync job, would
+    add infrastructure for no visible benefit at this scale. This is a
+    deliberate trade-off.
+  - If remove()'s local transaction failed after the upstream removal (rare),
+    voters wouldn't get refunds, although sync would still clean up the game.
+    The README lists this under limitations.
+  - The add → finalize path also handles a race where a parallel list sync
+    imports the new game before finalize runs. finalize deletes that imported
+    duplicate (GameRepository::finalize).
+
+  Want to look at VoteService.php next, since it follows the same
+  claim-then-call pattern, or at GameRepository.php to see the SQL behind these
+  calls?
+
+❯ VoteService
+
+⏺ VoteService.php (backend/src/Service/VoteService.php) handles casting and
+  removing votes. It follows the same claim-then-call pattern as GameService,
+  with one twist: removing a vote has to be reversible if EOA fails.
+
+  Constructor (lines 21–29)
+
+  It has the same dependencies as GameService: PDO for transactions, the EOA
+  client, the Clock, and the games, votes and daily-actions repositories.
+
+  vote(): cast a vote (lines 31–66)
+
+  1. Lines 33–37: the game must exist and be fully added. A row without an EOA
+     id is still being added, and you can't vote on it yet. Both cases give a
+     404.
+  2. Lines 39–41: early duplicate check. If you've already voted for this game,
+     you get 409 ALREADY_VOTED. This is a fast, friendly path. The real
+     guarantee is the primary key in step 4.
+  3. Line 43: your local date, using the time zone saved on your user, not
+     whatever the browser says now.
+  4. Lines 46–51: the claim, in one transaction.
+     - Insert today's daily_actions row, marked as a vote for this game. If
+       you've already acted today, the (user, date) key rejects it and you get
+       429 DAILY_LIMIT_REACHED with Retry-After set to the seconds until your
+       midnight.
+     - Insert the votes row. Its (user, game) primary key catches a double vote
+       that slipped past step 2, for example from two rapid clicks.
+     - Either both rows are written or neither is, so a rejected double vote
+       never costs you the day's action.
+  5. Lines 53–58: call EOA. If it fails, undoVote() removes both rows and you
+     get a friendly 502.
+  6. Lines 60–65: EOA says the game doesn't exist. EOA returns success:false
+     with HTTP 200, so the client turns that into false. The game was removed
+     upstream behind our back. We undo the claim, delete our stale copy, and
+     return 404 with "That game is no longer in the library." The frontend
+     treats that as "your view is stale" and re-syncs.
+
+  removeVote(): take a vote back (lines 72–112)
+
+  The class comment states the rule: removing a vote never costs an action. A
+  vote cast today refunds the action, as an undo. An older vote refunds nothing.
+
+  1. Lines 74–82: the game must exist (404). An anonymous visitor can't have
+     voted, so they get 404 "You haven't voted for this game." without a user
+     row ever being created.
+  2. Lines 86–101: delete and refund, in one transaction.
+     - Look up your vote. If there isn't one, or the delete affects no row (a
+       race with a parallel request), it's a 404.
+     - If the vote was cast today, releaseIf() hands back today's action, but
+       only if that action is exactly "a vote for this game". A vote from
+       yesterday doesn't refund today's add.
+     - It returns the date the vote was cast, which step 4 needs.
+  3. Lines 103–107: call EOA. If EOA reports the game gone, our copy is dropped
+     too. There's nothing left to un-vote, and the local removal already
+     happened.
+  4. Lines 108–111: EOA failed. Unlike vote(), the local change was already
+     committed. So restoreVote() tries to put the vote back with its original
+     cast date, then the error is reported.
+
+  Why the order differs between vote() and removeVote()
+
+  Both commit locally first, so the database rules settle concurrent requests
+  before anything goes upstream. What differs is the rollback:
+  - vote() undoes added rows. That's simple, because nothing else can depend on
+    rows that exist only for this request.
+  - removeVote() restores deleted rows. That's harder, because in between
+    someone else may have removed the game, or you may have used your freshly
+    refunded action on something else.
+
+  undoVote() (lines 114–120)
+
+  The rollback for vote(): delete the vote and release the matching action, in
+  one transaction.
+
+  restoreVote() (lines 128–142)
+
+  This is best-effort repair after an upstream failure in removeVote().
+  - It re-inserts the vote with its original date.
+  - If the vote was from today, it tries to re-claim today's action. A false
+    result means you already spent that action again in the meantime. The vote
+    is kept anyway: losing a vote you still wanted would be worse than one extra
+    action.
+  - If the restore itself fails (line 139), for example because the game was
+    removed in the meantime, it's logged and swallowed, so the user sees the
+    original friendly 502 instead of a 500. This was one of the hardening fixes
+    (item 10 in PLAN.md's table).
+
+  Worth knowing as a reviewer
+
+  - Two kinds of check. The friendly checks at the top (game exists, already
+    voted) aren't relied on for correctness. Database keys inside transactions
+    are. Under concurrency the early checks can be bypassed, and the database
+    still holds.
+  - EOA vote counts are anonymous and can't be trusted to "know" anything. EOA
+    would happily count the same vote twice, and removeVote succeeds even at
+    zero. So our votes table decides what's allowed, and EOA only stores the
+    count.
+  - A small edge case: if EOA counted a vote but the response failed (a timeout
+    after success), we undo locally and EOA keeps a vote nobody owns. The count
+    drifts by one, a known risk of any system without transactions across
+    services. Fixing it would need idempotency keys, which the EOA API doesn't
+    support.
+  - The tests are in backend/tests/VoteServiceTest.php: refunds, the time-zone
+    day boundary, upstream failures at each step, and the restore path.
+
+  Next options: DailyLimitService.php (short; it powers the banner), the
+  repositories that do the SQL behind these calls, or VoteServiceTest.php to see
+  how these paths are tested.
+
+❯ <ide_opened_file>The user opened the file /Users/tonyschappaugh/Websites/eoa-
+  challenge/backend/src/Service/DailyLimitService.php in the IDE. This may or
+  may not be related to the current task.</ide_opened_file>
+❯ backend/src/Service/DailyLimitService.php
+
+⏺ DailyLimitService.php (backend/src/Service/DailyLimitService.php) is the
+  smallest service. It only answers "can this person act today, and when does
+  that reset?" It doesn't enforce anything. Enforcement happens in the claim()
+  inside GameService::add() and VoteService::vote(). This service reports the
+  state so the UI can explain it.
+
+  Constructor (lines 13–17)
+
+  It needs only the daily-actions repository and the Clock. There's no EOA
+  client, because the daily rule is entirely ours.
+
+  status() (lines 25–38)
+
+  It's called by GET /api/me in Routes.php, which passes the user (or null) and
+  the identity's time zone.
+
+  1. Line 27: which time zone.
+     - A known user always gets their saved zone, the one locked at their first
+       write.
+     - An anonymous visitor (no cookie yet) gets the zone their browser reports
+       in X-Timezone. IdentityMiddleware has already checked it against the real
+       list of zone names, falling back to UTC.
+  2. Line 28: today's local date in that zone, as Y-m-d. This is exactly what
+     the claims use, so the banner and the enforcement can't disagree about what
+     "today" is.
+  3. Line 29: today's action. An anonymous visitor has none by definition. That
+     avoids a database query and never creates a user row.
+  4. Lines 31–37: the response, for example:
+  {
+    "timezone": "America/Chicago",
+    "localDate": "2026-11-13",
+    "actionAvailable": false,
+    "action": { "type": "vote", "gameId": 7 },
+    "resetsAt": "2026-11-14T00:00:00-06:00"
+  }
+     - action.type lets the banner say "You've used today's vote" or "today's
+       game suggestion".
+     - resetsAt is the user's next local midnight, as an ISO timestamp with its
+       UTC offset, so the browser can turn it into an exact moment in time.
+
+  How the frontend uses it
+
+  - LimitBanner.tsx shows the state, the reset time in the user's zone, and a
+    live countdown driven by useNow.
+  - useGameLibrary.ts sets a timer for resetsAt and refreshes when it passes, so
+    the banner and the buttons re-enable at midnight without a reload. That's
+    the timer with the 2^31 - 1 clamp, because setTimeout fires immediately on
+    longer delays.
+  - The vote and add buttons use actionAvailable to show the greyed-out state
+    with an explanation. The server still decides, and if the UI is stale the
+    429 response corrects it.
+
+  Worth knowing as a reviewer
+
+  - Reporting and enforcement are separate, by design. If this service had a
+    bug, the banner could be wrong, but nobody could act twice: the database key
+    decides.
+  - Daylight saving time: "next midnight" is computed in the zone with PHP's
+    date library (Clock::nextMidnight), so a 23- or 25-hour day is handled
+    correctly. In the rare zones where clocks jump at midnight, PHP moves to the
+    first valid time, so the reset still happens.
+  - The time-zone lock is what stops gaming the rule. Changing your computer's
+    time zone after your first action can't create a new "today", because
+    status() and the claims both use the saved zone. ClockTest and
+    GameServiceTest cover the day boundaries across zones (for example,
+    testTheLimitResetsAtTheUsersLocalMidnightNotUtc).
+
+  That covers the three services. Natural next steps would be Clock.php (the
+  date math these rely on), Http/IdentityMiddleware.php (where the time zone
+  gets locked), or the repositories.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/backend/src/Domain/Clock.php in
+  the IDE. This may or may not be related to the current
+  task.</ide_opened_file>
+
+❯ lets do clock
+
+⏺ Clock.php (backend/src/Domain/Clock.php) is about 45 lines, and everything
+  date-related depends on it. It answers three questions: what time is it,
+  what's the user's local date, and when is their next midnight.
+
+  Constructor (lines 14–16)
+
+  public function __construct(private readonly ?Closure $source = null)
+  The optional $source is a function that returns "now". Production passes
+  nothing, so the real clock is used. Tests pass a closure returning a fixed
+  time. For example, HttpTest pins the time to 15:00 UTC, which is how
+  testDailyLimitTellsTheClientWhenToRetry can assert exactly Retry-After: 32400,
+  the nine hours to midnight. Without this, day-boundary tests would depend on
+  when the suite happens to run.
+
+  now() (lines 18–23)
+
+  Returns the injected time, or the real current time in UTC. Everything starts
+  from one absolute UTC moment and converts to local time only when needed. That
+  avoids depending on the server's own time zone, which in a container could be
+  anything.
+
+  today() (lines 26–29)
+
+  The user's current local date as Y-m-d, for example 2026-11-13. That string is
+  what's stored in daily_actions.local_date and votes.cast_local_date, and what
+  (user_id, local_date) keys on. "One action per day" literally means "one row
+  per user per value of this string".
+
+  nextMidnight() (lines 31–34)
+
+  return $this->local($zone)->setTime(0, 0)->modify('+1 day');
+  Take local now, rewind to the start of today, and step forward one calendar
+  day. Two details make this correct:
+  - +1 day is a calendar step, not "+86,400 seconds". On a daylight-saving
+    change day the result is still the next local midnight, even though that day
+    is 23 or 25 hours long.
+  - In the few zones where clocks jump at midnight, so 00:00 doesn't exist on
+    some date, PHP moves to the first valid time (01:00). today() also only
+    changes to the new date at that moment, so the reset time and the date
+    change always agree.
+
+  The result keeps its UTC offset, so DailyLimitService can send it as
+  2026-11-14T00:00:00-06:00, an exact moment the browser can count down to.
+
+  secondsUntilMidnight() (lines 36–39)
+
+  The gap between now and the next midnight, in seconds. It feeds the
+  Retry-After header on 429 DAILY_LIMIT_REACHED. Next midnight is always in the
+  future, so it's always positive.
+
+  local() (lines 41–46)
+
+  The helper the others use: take now (UTC) and convert it to the zone. It
+  accepts either a User, in which case it uses their saved zone, or a zone name.
+  That User|string union exists because the services sometimes have a full user
+  (the current request) and sometimes only a zone name. One example is when
+  remove() refunds other voters, using the time zone stored with each vote's
+  user.
+
+  Worth knowing as a reviewer
+
+  - It's immutable throughout (DateTimeImmutable). setTime() and modify() return
+    new objects, so no calculation can quietly change another one's "now".
+  - Invalid zone names can't reach it. IdentityMiddleware checks X-Timezone
+    against PHP's list of real zones, falls back to UTC, and stores only valid
+    names. A bad name would otherwise make new DateTimeZone() throw.
+  - One request, more than one "now". Each call to now() reads the clock afresh.
+    Within one request, "today" and "seconds until midnight" could straddle
+    midnight by a millisecond. The worst case is a Retry-After that's slightly
+    off or zero at the exact boundary. The rule itself can't be broken, because
+    the database key still decides. Reading the time once per request would
+    remove even that, but it isn't worth the extra plumbing.
+  - Tests are in backend/tests/ClockTest.php: local dates across zones, the next
+    midnight, the seconds count, and a daylight-saving change day.
+
+  Next, Title.php (the duplicate and punctuation rules) is the other domain
+  class, or IdentityMiddleware.php, where the time zone gets locked in.
+
+❯ lets take a look at the front end pieces now
+
+⏺ I'll pull the current line counts first so I can point you to the right
+  places:
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend/src && wc -l main.tsx App.tsx
+      index.css hooks/*.ts components/*.ts* lib/*.ts test/*.ts test-setup.ts
+      *.test.tsx | sort -n)
+  ⎿  (No output)
+
+⏺ The frontend is about 1,700 lines of app code and 1,000 lines of tests. Here's
+  how it's organized.
+
+  The shape of it
+
+  main.tsx            mounts <App/>, imports the font and CSS
+  App.tsx             page layout; calls useGameLibrary() once
+   ├─ LimitBanner     "You can vote or suggest today" / countdown
+   ├─ ErrorAlert      page-level error, dismissible
+   ├─ AddGameForm     suggest a game, with inline validation
+   ├─ GameList        sorting, list, remove dialog, focus handling
+   │   ├─ SortControls  (top; a second set from 11 games)
+   │   ├─ GameItem      one row: rank, title, votes, Vote / Remove
+   │   └─ ConfirmDialog native <dialog> for "Remove X?"
+   └─ StatusRegion    screen-reader announcements ("Voted for X.")
+
+  The key design choice: one hook owns all server state. App.tsx calls
+  useGameLibrary() once and passes the result down as library. Components read
+  from it and call its actions (vote, unvote, remove, add). They never fetch on
+  their own. Everything about consistency, such as optimistic updates, rollback,
+  stale responses and the midnight refresh, lives in one place. The components
+  stay mostly presentational.
+
+  The layers
+
+  1. Talking to the server (lib/)
+  - api.ts (158 lines): the fetch client, and the only file that knows the API
+    contract.
+    - Headers: it sends X-Timezone on every request, X-Requested-With on writes,
+      and JSON with credentials: 'same-origin'.
+    - Timeout: 15 seconds.
+    - Validation: it checks the shape of every response.
+    - Errors: every failure becomes an ApiError with a code. Server codes pass
+      through, and transport problems become NETWORK_ERROR or
+      UNEXPECTED_RESPONSE.
+  - types.ts: the Game and Me types, mirroring the backend's JSON.
+  - messages.ts: friendlyMessage() turns an error into user-facing words.
+    shouldResync() decides which errors mean "your view is out of date,
+    refetch": daily limit, already voted, not found.
+
+  2. State (hooks/)
+  - useGameLibrary.ts (372 lines): the brain of the frontend.
+    - State: status (loading, ready or error), games, me, errors, the
+      screen-reader notice, and which games have a request pending.
+    - Fetching (fetchAll, settle, refresh): a response is applied only if it's
+      still the newest. A refresh that would undo a pending change waits until
+      the change finishes, and a refresh that had to be skipped is replayed
+      later.
+    - runOptimistic(): applies a change at once, sends it, and on failure rolls
+      back only that game. vote, unvote and remove are built on it. add waits
+      for the server, because it needs the new id.
+    - The midnight timer: it re-checks the daily limit when it resets.
+  - useNow.ts: a ticking clock for the banner's countdown.
+
+  3. Pure logic (lib/) has no React and is fully unit-tested.
+  - title.ts: the client-side copy of the backend's cleaning, duplicate and
+    punctuation-folding rules, for instant feedback. The server still decides.
+  - sort.ts: Rank and A–Z ordering, the next sort on each click, and the wording
+    for headings and announcements.
+  - time.ts: formats the reset time and the countdown.
+
+  4. Components (components/)
+  - GameList.tsx (185 lines): holds the chosen sort, derives the displayed order
+    and the true ranks, shows the loading, error and empty states, and runs the
+    remove dialog, moving focus to the heading afterward.
+  - GameItem.tsx: one row. The vote button is a toggle (aria-pressed), and
+    Remove appears only on games you added.
+  - AddGameForm.tsx: validates locally first, shows field errors next to the
+    input, and announces errors when focus can't move.
+  - SortControls.tsx, ConfirmDialog.tsx, LimitBanner.tsx, ErrorAlert.tsx,
+    StatusRegion.tsx: small and focused.
+  - styles.ts: the shared Tailwind class strings for buttons and inputs. It's
+    the one place to change the button styles.
+
+  5. Shell and theme: App.tsx (layout, skip link, header, intro section),
+  index.css (theme colors and font as Tailwind tokens), main.tsx.
+
+  6. Tests (74):
+  - App.test.tsx (733 lines): full-app tests that render the real App against
+    test/fakeServer.ts, an in-memory backend behind a stubbed fetch. Every test
+    goes through the real API client and the real hook, so they test behavior,
+    not implementation. It includes axe accessibility checks.
+  - lib/*.test.ts: unit tests for the API client, titles, sorting and time.
+
+  Choices a reviewer might ask about
+
+  - No React Query, Redux or similar library. The app has one list and four
+    actions. A focused hook keeps the rollback rules explicit and readable,
+    without adding a dependency. If the app grew, React Query would be the
+    natural step up.
+  - The server is always the authority. Every client-side check (title
+    validation, limit-greyed buttons) is only there for speed and explanation.
+    The server's response corrects the UI when they disagree.
+  - Accessibility isn't an add-on:
+    - Buttons stay focusable when unavailable (aria-disabled), and the reason is
+      linked to them.
+    - Success messages are announced politely and errors assertively.
+    - Focus is managed after removal.
+    - axe runs in the tests.
+
+  Suggested order for drilling down
+
+  1. lib/api.ts: short, and it defines the contract everything else relies on.
+  2. hooks/useGameLibrary.ts: the most important and most intricate file. I'd go
+     through it section by section.
+  3. components/GameList.tsx and GameItem.tsx: how the state becomes UI.
+  4. AddGameForm.tsx, then the small components.
+  5. App.test.tsx: to see how it's all exercised.
+
+  Which would you like to start with? I'd suggest api.ts.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/src/App.tsx in the IDE.
+  This may or may not be related to the current task.</ide_opened_file>
+
+❯ frontend/src/App.tsx
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/frontend/src/lib/api.ts in the
+  IDE. This may or may not be related to the current task.</ide_opened_file>
+
+❯ actually frontend/src/lib/api.ts
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(cd ~/Websites/eoa-challenge/frontend/src && grep -rn "\.status\b"
+      --include='*.ts' --include='*.tsx' . | grep -v
+      "library.status\|response.status\|\.test\." ; g…)
+  ⎿  (No output)
+
+⏺ api.ts (frontend/src/lib/api.ts) is the only file in the frontend that knows
+  how to talk to the server. Everything else calls its six exported functions
+  and gets back typed data or an ApiError.
+
+  ApiError (lines 3–13)
+
+  One error type for every failure. code is what the app branches on, for
+  example DAILY_LIMIT_REACHED or NETWORK_ERROR, and message is human-readable.
+  Branching on code rather than the HTTP status matters, because a 429 can mean
+  either the daily limit (from PHP) or the rate limit (from nginx), and they
+  need different handling.
+
+  Helpers (lines 15–41)
+
+  - REQUEST_TIMEOUT_MS (line 15): 15 seconds. A hung request becomes an error
+    instead of a spinner forever.
+  - isRecord (lines 17–19): "is this a plain object?". It's the building block
+    for the shape checks below.
+  - parseJson (lines 21–27): returns undefined instead of throwing on bad JSON.
+    That covers non-JSON responses, such as an HTML error page if nginx can't
+    reach PHP.
+  - toApiError (lines 29–41): if the server sent our standard error shape, {
+    error: { code, message } }, it keeps that code and message. Otherwise the
+    response is unexpected. Both PHP and nginx's rate-limit response use the
+    same shape, so both arrive with meaningful codes.
+
+  request(): the one place fetch is called (lines 43–87)
+
+  1. Lines 48–52: headers on every request. Accept: application/json and
+     X-Timezone, the browser's time zone name, for example America/Chicago. The
+     backend saves it on your first write so "per day" means your day.
+  2. Lines 54–57: X-Requested-With on every write. The backend's CSRF guard
+     rejects writes without it, and because it's a custom header, a cross-site
+     page can't send it without a CORS preflight that's never approved.
+  3. Lines 59–61: Content-Type: application/json only when there's a body. The
+     backend accepts only JSON bodies, which plain HTML forms can't send.
+  4. Lines 64–74: the fetch.
+     - /api paths are relative, so the request always goes to the same origin.
+     - credentials: 'same-origin' sends the uid cookie.
+     - AbortSignal.timeout enforces the 15 seconds.
+     - Any failure to get a response (offline, DNS, timeout) becomes
+       NETWORK_ERROR, which messages.ts words as "Can't reach the server. Check
+       your connection and try again."
+  5. Lines 76–86: reading the response. Read the body as text, then parse it. A
+     non-2xx status becomes an ApiError. A success that isn't JSON is treated as
+     unexpected rather than passed along.
+
+  Shape checks (lines 89–121)
+
+  isGame, isDailyAction and isMe check every field's type at runtime, so the
+  rest of the app can trust its types. TypeScript can't check data arriving over
+  the network, so without these, a backend change could produce undefined deep
+  inside a component. With them, a malformed response fails right here as
+  UNEXPECTED_RESPONSE. They also keep the "no any" rule, because data comes in
+  as unknown and is narrowed by these guards.
+
+  The public API (lines 123–158)
+
+  - getGames(): checks the wrapper { games: [...] } and every game.
+  - getMe(): the daily-limit status.
+  - addGame(): returns the created game, which the hook inserts into the list.
+  - removeGame(), vote(), removeVote(): succeed or throw. The { success: true }
+    body isn't inspected, because the HTTP status already says it.
+
+  Ids are numbers from typed Game objects, so the URL paths can't be injected
+  into.
+
+  Worth knowing as a reviewer
+
+  - Tests: lib/api.test.ts covers the headers, error mapping, timeouts, non-JSON
+    responses and shape rejection. The full-app tests use this real client too,
+    behind a stubbed fetch.
+  - A timeout reads as a network error. That's fine for users, but if you wanted
+    "The server is taking too long" as a separate message, it would be a small
+    change here plus a message in messages.ts.
+  - A small cleanup candidate: ApiError.status is never read. No app code or
+    test uses it, and two places set it to 0 instead of the real HTTP status
+    (lines 83 and 120), so it's also slightly inconsistent. The options are:
+    - (a) remove the field, or
+    - (b) keep it and pass the real status everywhere, which helps debugging.
+
+    I'd lean toward (b), since it costs one line each. Want me to add it to the
+    change list?
+  - Edge case: if the connection drops while the body is being read (line 76),
+    the browser throws a plain error rather than an ApiError. The app still
+    handles it: friendlyMessage shows "Something went wrong. Please try again."
+    It just isn't labeled as a network error.
+
+  Next would be hooks/useGameLibrary.ts, which consumes all of this, or one of
+  the smaller files if you'd prefer a break before the big one.
+
+❯ no changes for now.
+
+⏺ Noted. I won't make any changes and won't keep the ApiError.status item on the
+  list.
+
+  Shall we go on to hooks/useGameLibrary.ts? It's the largest frontend file, at
+  372 lines, so I'd take it section by section: state and refs, then fetching
+  and stale-response handling, then optimistic writes and rollback, then the
+  four actions and the midnight timer. Or open any other file and I'll take that
+  one instead.
+
+❯ review frontend/src/hooks/useGameLibrary.ts
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ useGameLibrary.ts (frontend/src/hooks/useGameLibrary.ts) holds all of the
+  frontend's server state, and every server interaction goes through it. Here it
+  is in seven sections.
+
+  1. Types and constants (lines 7–57)
+
+  - Status (line 7): loading, ready or error, for the list area.
+  - AddResult (lines 9–10): what add() returns to the form. On failure, field:
+    true means "show this next to the input" (validation or duplicate).
+    Everything else goes to the page alert.
+  - Notice (lines 12–15): a screen-reader announcement. The id changes even when
+    the text repeats, so "Voted for X." is announced again the second time.
+  - MAX_TIMEOUT_MS (line 17): the largest delay setTimeout accepts. Anything
+    bigger fires immediately, a real bug the tests caught.
+  - LIMIT_MESSAGE and FIELD_CODES (lines 19–23): the client-side limit message,
+    and which error codes count as field errors.
+
+  2. Pure helpers (lines 25–50)
+
+  - sortByVotes (26–28): the same order as the server: most votes first, then
+    lowest id. Because they match exactly, an optimistic vote puts the row where
+    the server will, and nothing jumps when the refresh arrives.
+  - upsertGame (31–33): puts one game back (or in), leaving the rest alone.
+    Rollback uses it to undo only the failed action, and add uses it to insert
+    the new game.
+  - revertFields (37–43): undoes exactly the fields an optimistic change touched
+    in me, leaving any fields another action has changed since.
+  - OptimisticChange (45–50): describes one optimistic action: how it changes
+    the list, optionally how it changes me, and whether "not found" means "gone"
+    (for removals).
+  - FetchOutcome (lines 52–57): the three possible fates of a fetch. This drives
+    section 4.
+
+  3. State and refs (lines 60–96)
+
+  - State (60–67) is what renders: the list, me, two kinds of error (loadError
+    for "couldn't load the list", actionError for a failed action), the notice,
+    the set of game ids with requests in flight (pendingIds, which greys those
+    buttons), and adding.
+  - Refs (69–76) are bookkeeping the async code needs without re-rendering:
+    - meRef, statusRef and pendingRef mirror state (updated by the effect at
+      lines 78–82), so callbacks can read the latest values without being
+      recreated on every render.
+    - fetchId, writeEpoch, writesInFlight and refreshOwed coordinate fetches
+      against writes (section 4).
+    - noticeId counts announcements.
+  - announce (84–87) and setPending (89–96): small helpers. setPending copies
+    the Set instead of mutating it, so React sees a change.
+
+  4. Fetching and stale responses (lines 98–174)
+
+  This is the part the two review rounds hardened.
+
+  fetchAll() (98–127) fetches the games and me in parallel, then decides whether
+  it's still allowed to apply them:
+  - Each call takes a ticket (fetchId) and notes the current write count
+    (writeEpoch).
+  - When the response arrives, outcome() (104–111) checks two things:
+    - A newer fetch has started: this result is superseded. Drop it, since the
+      newer one decides.
+    - A write started, or is still running: this result is interrupted. It may
+      predate the write and would undo its optimistic change. Drop it, but set
+      refreshOwed.
+  - Errors get the same check (116–120). A stale fetch's failure is dropped too,
+    so an old timeout can't overwrite a list that loaded fine.
+
+  settle() (130–138) fetches until a result is applied or someone else takes
+  over. If a fetch was interrupted but the write already finished, nobody else
+  will refetch, so it loops and fetches again.
+
+  refresh() (146–164) is the public "sync with the server" action:
+  - On success, it marks the list ready and clears any load error. That's how an
+    add that succeeds after a failed load brings the list back.
+  - On failure, it shows the right kind of error. Before any list has loaded,
+    it's the load-error box with Try again. After that, it's the page alert,
+    keeping the list visible.
+  - Its handlers are written as promise callbacks so the React lint rule about
+    state updates in effects accepts them.
+
+  load() (166–170) is the Try again button: show the loading state and refresh.
+  Lines 172–174 do the initial load on mount.
+
+  5. The midnight timer (lines 176–185)
+
+  When me.resetsAt changes, it schedules a refresh one second after the user's
+  local midnight.
+  - Clamps: at least 1 second, and at most MAX_TIMEOUT_MS. The upper clamp
+    covers a reset more than about 24.8 days away, which happens in tests.
+  - The cleanup cancels the old timer whenever resetsAt changes or the component
+    unmounts.
+  - It can't loop: if the clocks disagree and the refresh returns the same
+    resetsAt, the effect doesn't re-run, so it won't spin every second.
+
+  6. Optimistic writes: runOptimistic() (lines 189–241)
+
+  This is the shared engine for vote, unvote and remove.
+  1. Line 196: ignore clicks on a game that already has a request in flight.
+  2. Lines 198–206: apply immediately.
+     - Note me before the change.
+     - Bump writeEpoch, so any fetch already in flight can't apply, and count
+       this write in writesInFlight.
+     - Clear the old error, mark the game pending, and apply the list change and
+       the me change.
+  3. Lines 209–213: success. Announce it and mark that a resync is needed.
+  4. Lines 214–230: failure.
+     - Roll back only this game with upsertGame (line 221), unless it was a
+       removal and the server said "not found". In that case the game really is
+       gone, and putting it back would make it flicker.
+     - Roll back only the me fields this change touched (lines 222–227).
+     - Show the error in words. Resync only for errors that mean the view is
+       stale (daily limit, already voted, not found).
+  5. Lines 231–238 (finally): count the write as finished and clear pending.
+     Then refresh if this write needs it, or if a refresh was dropped while
+     writes ran and this was the last write. That replay closes the gap where a
+     dropped refresh would never happen.
+
+  7. The four actions (lines 243–351)
+
+  - vote (243–272): a quick local check first. If today's action is used, it
+    explains the rule without calling the server. Then it optimistically adds a
+    vote, re-sorts, and marks the day's action as used.
+  - unvote (274–294): removes the vote optimistically, but deliberately doesn't
+    guess at me, because only the server knows whether a refund applies (a vote
+    cast today, or an older one). The refresh afterward brings the real answer.
+  - remove (296–308): filters the game out and sets goneOnNotFound. It returns
+    true or false so GameList can manage focus.
+  - add (310–351): not optimistic, because the new game's id comes from the
+    server.
+    - It shows "Adding…", calls the server, inserts the result (deduplicated, in
+      case a refresh already brought it in), marks the day's action as used,
+      announces, and refreshes.
+    - On failure, it decides whether the error belongs next to the field or in
+      the page alert.
+
+  Lines 353–369: what the hook returns. GameLibrary (line 372) is that return
+  type, passed to components as library.
+
+  Worth knowing as a reviewer
+
+  - This is the most intricate file in the project, and the complexity is
+    deliberate. Section 4 exists because both review rounds found real races: a
+    slow refresh undoing a newer click, a dropped refresh never replaying, and
+    an add stuck behind a failed load. Each has a regression test in
+    App.test.tsx that fails without the fix.
+  - Refs mirror state (lines 78–82) so the callbacks stay stable. They're
+    updated after each render, the usual React pattern. A handler can only run
+    after a render has committed, so it always sees current values.
+  - Could it be split? Sections 4 and 6 could become a generic "optimistic
+    resource" hook. At this size I'd keep it together, because the coordination
+    between fetches and writes is easier to follow in one file.
+  - The server stays the authority. The local limit check and the optimistic
+    changes are for speed and explanation, and every write is followed by a
+    refresh that reconciles with the server.
+
+  Any section you want to dig into further? The next natural file is
+  components/GameList.tsx, which shows how this state becomes the list UI.
+
+❯ OK that is it for review before submitting. What are my final steps.
+
+⏺ You've finished the review. Here's the path to submission, in order. Doing the
+  transcript on docs/submission before merging means main gets just one more
+  merge.
+
+  Final steps
+
+  1. Mark the project done in CLAUDE.md (me).
+  I'll replace the "Hold: don't merge or push" status with a final status, so
+  the submitted repo doesn't look unfinished, and commit it on docs/submission.
+
+  2. Export the transcript (you).
+  Run this in Claude Code:
+  /export ai-logs/transcript.md
+  Then tell me it's done, and check that the file landed at
+  ~/Websites/eoa-challenge/ai-logs/transcript.md.
+
+  One caveat: this session ran long enough that its earlier part was compacted
+  into a summary. The export may contain that summary rather than every early
+  message. The complete record is ai-logs/session-2026-11-11-16730bd4.md, which
+  the logging hook wrote live from the first message. After the export, I'll
+  check what it actually contains and adjust the README's "How AI was used"
+  wording if needed, so it describes both files accurately.
+
+  3. Scrub, check and commit the transcript (me).
+  - I run scripts/scrub-transcript.sh ai-logs/transcript.md.
+  - I search the file for the current key and for anything key-shaped.
+  - I commit it on docs/submission. The pre-commit hook checks it again.
+
+  4. Push, merge and push (you).
+  cd ~/Websites/eoa-challenge
+  git add ai-logs && git commit -m "chore: update AI session log" || true
+  git push                                   # docs/submission; wait for CI
+  green
+  git checkout main && git pull
+  git merge --no-ff docs/submission
+  #   if only the AI log conflicts: git checkout --theirs
+  ai-logs/session-2026-11-11-16730bd4.md
+  #                                 git add ai-logs && git commit --no-edit
+  git push                                   # wait for CI green on main
+
+  5. Commit the final AI log (you, last).
+  My replies keep being added to the session log, so after my final message,
+  commit it from main:
+  git add ai-logs && git commit -m "chore: final AI session log" && git push
+  That captures the complete conversation, including my last reply.
+
+  6. Check the public repo (you).
+  In a private window, open https://github.com/tschappaugh/eoa-challenge and
+  check:
+  - The README renders correctly.
+  - ai-logs/ contains the session log and transcript.md.
+  - There's no .env.
+  - The Actions tab is green on main.
+
+  7. Submit.
+  Send the repo URL however the challenge instructions say. I haven't seen that
+  part, so check them for anything else they ask for.
+
+  Optional tidying, which I'd skip: the merged feature branches on GitHub can
+  stay. They show how the work progressed, which suits a submission. Your local
+  .env key expires on its own and never left your machine.
+
+  Shall I do step 1 now?
+
+❯ do step 1
+
+⏺ Bash(cd ~/Websites/eoa-challenge && git branch --show-current && git status
+      --short && sed -n '/^## Current status/,/^## Frontend contract/p'
+      CLAUDE.md | tail -24)
+  ⎿  (No output)
+
+⏺ Bash(cd ~/Websites/eoa-challenge && python3 - <<'EOF'
+      p='CLAUDE.md'…)
+  ⎿  No matches found
+
+⏺ No "Hold", "In progress", "Not done" or "Next" markers are left. Committing
+  locally on docs/submission:
+⏺ Bash(cd ~/Websites/eoa-challenge && git add CLAUDE.md && git commit -q -F -
+      <<'EOF'
+      docs: mark the project complete in CLAUDE.md…)
+  ⎿  (No output)
+
+⏺ Step 1 is done. I committed it on docs/submission as 765b283, with the AI log
+  in its own commit, d13fcb4. Nothing has been pushed.
+
+  CLAUDE.md's status section now describes the finished project instead of the
+  hold:
+  - Final review merged.
+  - The submission branch contents: README, the key script, the favicon, the
+    illustration credit, and the write-path correction.
+  - The fresh-clone quick start check, and your code review before the final
+    merge.
+  - Test counts (86 PHPUnit, 74 Vitest) and five green CI jobs.
+  - Where the AI record lives: the live session log and transcript.md.
+
+  The new text already mentions ai-logs/transcript.md, which steps 2 and 3
+  create on this same branch before anything is merged.
+
+  Step 2 (you): run this in Claude Code:
+  /export ai-logs/transcript.md
+  Then tell me it's done, and I'll scrub it, check it for the key, review what
+  it covers, and commit it.
+
+❯ <ide_opened_file>The user opened the file
+  /Users/tonyschappaugh/Websites/eoa-challenge/transcript.md in the IDE. This
+  may or may not be related to the current task.</ide_opened_file>
+
+❯ where do i place that file?
+
+⏺ Your export landed at the repo root as transcript.md. It belongs in ai-logs/
+  next to the session log, where the README points. I'll move it for you, then
+  do step 3.
+
+⏺ Bash(cd ~/Websites/eoa-challenge && ls -la transcript.md ai-logs/ 2>&1; git
+      status --short)
+  ⎿  (No output)
+
+⏺ There's no transcript.md on disk yet, either at the repo root or in ai-logs/.
+  The tab open in your editor looks like an unsaved buffer at the repo root.
+
+  Where it goes: ai-logs/transcript.md, the full path being
+  /Users/tonyschappaugh/Websites/eoa-challenge/ai-logs/transcript.md, next to
+  the session log.
+
+  How to get it there depends on what /export did for you:
+  - If it saved a file: run /export ai-logs/transcript.md in the Claude Code
+    prompt. The path is relative to the project folder.
+  - If it opened a save dialog: browse to the ai-logs folder in the project and
+    save it as transcript.md.
+  - If it copied to the clipboard, which the VS Code extension sometimes does:
+    paste it into that open editor tab, then Save As ai-logs/transcript.md.
+    Don't save it at the repo root.
+
+  If you've already pasted the transcript into the root tab, just save it there,
+  and I'll move it into ai-logs/ myself.
+
+  Once the file exists, tell me and I'll run the scrub, check it for the key,
+  review what it covers, and commit it.
