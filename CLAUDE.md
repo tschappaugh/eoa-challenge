@@ -31,8 +31,9 @@ office library. The full plan and all product decisions are in
   (`/api/me`, `/api/games`, vote endpoints). 71 PHPUnit tests pass against a
   real MySQL test DB; verified live against the EOA API.
 - **Gotcha:** EOA API keys expire (a key from the previous day was
-  rejected). If the API starts answering `INVALID_KEY`, generate a new key
-  into `.env` without printing it and run `docker-compose up -d php`.
+  rejected), and each key has its own library. If the API starts answering
+  `INVALID_KEY`, run `scripts/generate-key.sh` (never prints the key) and
+  `docker-compose up -d php`.
 - **Done (hardening, merged):** security review fixes and CI (five green
   jobs: backend, frontend, docker, secret scan, dependency audit).
 - **Done (frontend, merged):** React UI for the full feature set (ranked
@@ -42,14 +43,23 @@ office library. The full plan and all product decisions are in
   compared with look-alike quotes and dashes folded, and Rank / A-Z sorting
   (`feat/sort`, merged). Verified in real Chrome (axe: 0 violations incl.
   contrast, mobile 390px, keyboard, focus, CSP clean).
-- **In progress (design, branch `feat/design`):** Montserrat (self-hosted),
-  new heading and intro copy, header with "Code Challenge" on the right, and
-  an intro image beside the text (above it on mobile). Further design work
-  may follow on this branch. Tests: 74 Vitest.
-- **Not done:** README, final transcript export, fresh-clone verification.
-- **Next:** finish and merge `feat/design`, then `docs/submission` (README,
-  a11y pass, scrubbed transcript, fresh-clone `docker-compose up` check).
-  Run the backend tests with `--build` so the test image isn't stale.
+- **Done (design, merged):** Montserrat (self-hosted), new heading and intro
+  copy, header with "Code Challenge" on the right, intro image beside the
+  text (above it on mobile). CI now runs on every branch push.
+- **Done (final review, branch `fix/final-review`):** full-repo security and
+  best-practices pass (secrets, dependencies, code, Docker, CI); Node 20
+  (EOL) replaced by Node 24; nginx gzip for static files. Recorded in
+  PLAN.md -> "Final review".
+- **In progress (branch `docs/submission`, based on `fix/final-review`):**
+  README, `scripts/generate-key.sh` (writes a new key to `.env` without
+  printing it), PLAN.md write-path correction.
+- **Hold:** the user is reviewing all code before anything else is merged
+  to `main`. Don't merge or push.
+- **Not done:** final transcript export to `ai-logs/transcript.md` (run
+  `scripts/scrub-transcript.sh` on it and search it for the key before
+  committing), illustration license/credit confirmation, final fresh-clone
+  check following only the README.
+- Run the backend tests with `--build` so the test image isn't stale.
 
 ## Frontend contract (from hardening)
 
