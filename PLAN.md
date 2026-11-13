@@ -274,6 +274,17 @@ clients share one IP, so rate limits are effectively global locally.
   focusable; clicking explains why in the page alert and the button is
   described by the banner. Removing a vote is never blocked. The banner
   re-checks itself at the user's local midnight.
+- **Sorting (added after review):** the list defaults to most votes first.
+  A Rank button and an A–Z button sort it in the browser (the full list is
+  already fetched, so there is no backend work); clicking the active button
+  reverses it (fewest votes first, Z to A), and clicking the other one
+  switches to its default direction. The controls sit above the list, greyed
+  out (`aria-disabled`) with fewer than two games, and a second set appears
+  below the list from 11 games. Rank numbers always show the true vote
+  rank, whatever the order. A–Z ignores case and accents and orders numbers
+  as numbers ("Portal 2" before "Portal 10"); ties fall back to the lowest
+  id. The choice is not stored (a reload returns to rank order), the
+  heading names the current order, and each change is announced politely.
 - **Errors:** every failure is shown in words (network, rate limit, daily
   limit, duplicate, upstream outage); field errors appear next to the
   input, everything else in the page alert. No silent failures.

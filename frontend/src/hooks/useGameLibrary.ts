@@ -359,6 +359,7 @@ export function useGameLibrary() {
     notice,
     pendingIds,
     adding,
+    announce,
     load,
     dismissError,
     vote,
