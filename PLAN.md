@@ -258,6 +258,28 @@ Known limitations: cookie clearing still yields a new identity (accepted by
 the brief; rate limits bound the damage). Behind Docker Desktop all local
 clients share one IP, so rate limits are effectively global locally.
 
+## Final review (pre-submission)
+
+A full-repo pass before submission, beyond diff reviews:
+
+- **Secrets:** `.env` never tracked; the current key in no commit, branch,
+  file, or log; no key-shaped value ever added to tracked files; no other
+  credential patterns in history. The only key-shaped value in the logs is
+  the fake fixture in `scripts/test-redact.sh`.
+- **Dependencies:** `npm audit` and `composer audit` clean. Major upgrades
+  (Guzzle 8, PHPUnit 12, PHPCS 4) deliberately held back.
+- **Code:** all SQL prepared (native, no emulation); JSON-only bodies plus
+  the CSRF guard; cookie HttpOnly, SameSite=Lax, Secure behind HTTPS; the key
+  never reaches messages or traces; no `innerHTML`/`eval`/cookie access in
+  the frontend; one external script, no inline code, so the CSP holds.
+- **Fixed:** Node 20 (end of life April 2026) replaced by Node 24 LTS in the
+  web image and CI (`frontend/.nvmrc` added); nginx gzip for static files
+  only (JS 239 KB to 75 KB, CSS 18 KB to 5 KB). API responses stay
+  uncompressed: small, per-user, and `no-store`.
+- **Left as is:** CI actions and base images use version tags, not pinned
+  SHAs or digests (a production hardening step); nginx and php-fpm masters
+  run as root with unprivileged workers (the images' defaults).
+
 ## Frontend implementation notes (Phase 4)
 
 - **Structure:** `lib/` (API client, messages, title and time helpers),
