@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -106,7 +106,7 @@ jobs:
           coverage: none
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Composer audit
         working-directory: backend
         run: |
