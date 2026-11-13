@@ -539,6 +539,148 @@ describe('removing a game that is already gone', () => {
   })
 })
 
+function sortGroups() {
+  return screen.getAllByRole('group', { name: /^sort games/i })
+}
+
+async function titlesInOrder() {
+  return (await listItems())
+    .map((item) => within(item).getByRole('heading'))
+    .map((heading) => heading.textContent)
+}
+
+describe('sorting', () => {
+  it('greys out the controls with no games or one game', async () => {
+    const { user } = await renderApp({ games: [] })
+    const [group] = sortGroups()
+    const rank = within(group).getByRole('button', { name: /sort by rank/i })
+    const name = within(group).getByRole('button', { name: 'Sort A–Z' })
+
+    expect(rank).toHaveAttribute('aria-disabled', 'true')
+    expect(name).toHaveAttribute('aria-disabled', 'true')
+    expect(name).toHaveAccessibleDescription(/available once there are two/i)
+    await user.click(name)
+    expect(
+      screen.getByRole('heading', { name: 'Games, most votes first' })
+    ).toBeInTheDocument()
+  })
+
+  it('stays greyed out with a single game, and has one set of controls', async () => {
+    await renderApp({ games: [zelda] })
+
+    expect(sortGroups()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Sort A–Z' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  })
+
+  it('starts on rank, most votes first', async () => {
+    await renderApp()
+
+    expect(
+      screen.getByRole('button', { name: 'Sort by rank, most votes first' })
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Sort A–Z' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+    expect(await titlesInOrder()).toEqual(['Zelda', 'Mario', 'Tetris'])
+  })
+
+  it('sorts A to Z, reverses to Z to A, and keeps the true vote ranks', async () => {
+    const { user } = await renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Sort A–Z' }))
+
+    expect(await titlesInOrder()).toEqual(['Mario', 'Tetris', 'Zelda'])
+    expect(
+      screen.getByRole('heading', { name: 'Games, A to Z' })
+    ).toBeInTheDocument()
+    await expectStatus('Sorted alphabetically, A to Z.')
+    const items = await listItems()
+    // Mario is 2nd by votes, Tetris 3rd, Zelda 1st.
+    expect(within(items[0]).getByText('2')).toBeInTheDocument()
+    expect(within(items[1]).getByText('3')).toBeInTheDocument()
+    expect(within(items[2]).getByText('1')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sort A–Z' }))
+
+    expect(await titlesInOrder()).toEqual(['Zelda', 'Tetris', 'Mario'])
+    expect(screen.getByRole('button', { name: 'Sort Z–A' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expectStatus('Sorted alphabetically, Z to A.')
+  })
+
+  it('reverses the rank order, and returns to it from A to Z', async () => {
+    const { user } = await renderApp()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Sort by rank, most votes first' })
+    )
+    expect(await titlesInOrder()).toEqual(['Tetris', 'Mario', 'Zelda'])
+    expect(
+      screen.getByRole('heading', { name: 'Games, fewest votes first' })
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sort A–Z' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Sort by rank, most votes first' })
+    )
+
+    expect(await titlesInOrder()).toEqual(['Zelda', 'Mario', 'Tetris'])
+  })
+
+  it('keeps the chosen order when a vote changes the counts', async () => {
+    const { user } = await renderApp()
+    await user.click(screen.getByRole('button', { name: 'Sort A–Z' }))
+
+    await user.click(screen.getByRole('button', { name: 'Vote for Tetris' }))
+    await expectStatus('Voted for Tetris.')
+
+    expect(await titlesInOrder()).toEqual(['Mario', 'Tetris', 'Zelda'])
+  })
+
+  it('shows a second set of controls below the list from 11 games', async () => {
+    const ten = Array.from({ length: 10 }, (_, i) =>
+      makeGame({ id: i + 1, title: `Game ${String.fromCharCode(65 + i)}` })
+    )
+    const { server, user } = await renderApp({ games: ten })
+    expect(sortGroups()).toHaveLength(1)
+
+    await user.type(screen.getByLabelText(/suggest a game/i), 'Game K')
+    await user.click(screen.getByRole('button', { name: 'Add game' }))
+    await expectStatus('Game K was added.')
+    expect(server.games).toHaveLength(11)
+
+    const groups = await waitFor(() => {
+      const found = sortGroups()
+      expect(found).toHaveLength(2)
+      return found
+    })
+    expect(groups[1]).toHaveAccessibleName('Sort games (end of list)')
+
+    await user.click(
+      within(groups[1]).getByRole('button', { name: 'Sort A–Z' })
+    )
+    // Both sets show the same state.
+    for (const group of sortGroups()) {
+      expect(
+        within(group).getByRole('button', { name: 'Sort A–Z' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    }
+  })
+
+  it('has no detectable violations with the controls shown', async () => {
+    const { user } = await renderApp()
+    await user.click(screen.getByRole('button', { name: 'Sort A–Z' }))
+
+    expect((await axe(document.body)).violations).toEqual([])
+  })
+})
+
 describe('accessibility', () => {
   it('has no detectable violations when the list is shown', async () => {
     await renderApp()
