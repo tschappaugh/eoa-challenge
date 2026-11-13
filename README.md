@@ -281,12 +281,17 @@ PLAN.md       the full plan, decisions, and API findings
 The whole project was built in a single Claude Code session, as the
 challenge requires. The full record is in [`ai-logs/`](ai-logs/):
 
-- `session-*.md`: every prompt, tool call and response, written live by a
-  Claude Code hook (`.claude/hooks/log-ai.sh`, configured in
-  `.claude/settings.json`), with the API key redacted before anything is
-  written.
-- `transcript.md`: the exported conversation, scrubbed with
-  `scripts/scrub-transcript.sh`.
+- `session-*.md`: **the complete record.** Every prompt, tool call and
+  response, written live by a Claude Code hook (`.claude/hooks/log-ai.sh`,
+  configured in `.claude/settings.json`), with the API key redacted before
+  anything is written. It starts the moment logging was enabled: the very
+  first request, which set up this logging, came just before, and its result
+  is the first entry.
+- `transcript.md`: Claude Code's `/export` of the conversation at the end,
+  scrubbed with `scripts/scrub-transcript.sh`. The session ran long enough
+  that Claude Code compacted its earlier history, so the export covers the
+  later part (running the app, the code reviews, sorting, design, the final
+  review and submission). The session log covers everything.
 
 How the work was split:
 
