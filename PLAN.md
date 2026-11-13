@@ -155,7 +155,9 @@ never sent to the browser. See [Secret handling](#secret-handling).
 - **Backend:** PHP 8.3, Slim 4, PDO, Guzzle; PHPUnit.
 - **Database:** MySQL 8, migrations run on container startup.
 - **Frontend:** React, TypeScript, Vite, Tailwind v4; Vitest + React Testing
-  Library.
+  Library. Montserrat is self-hosted through the `@fontsource-variable`
+  package: the CSP allows only same-origin fonts and styles, and it keeps
+  visitors' requests off third-party servers.
 - **Docker Compose:** `web` (nginx serving the built SPA and proxying `/api`),
   `php` (php-fpm), `db` (MySQL).
 
@@ -285,6 +287,13 @@ clients share one IP, so rate limits are effectively global locally.
   as numbers ("Portal 2" before "Portal 10"); ties fall back to the lowest
   id. The choice is not stored (a reload returns to rank order), the
   heading names the current order, and each change is announced politely.
+- **Page design:** the intro sits in a wider section (`max-w-4xl`) than the
+  form and list (`max-w-2xl`): an illustration beside the heading and intro
+  text from the `md` breakpoint, above it on mobile (cropped to 4:3 so it
+  doesn't push the form down). The image lives in `src/assets` so Vite hashes
+  it and nginx serves it with the immutable cache header; its size
+  attributes reserve the space. The intro copy says "once per day, either
+  suggest a game or vote", matching the one-action rule.
 - **Errors:** every failure is shown in words (network, rate limit, daily
   limit, duplicate, upstream outage); field errors appear next to the
   input, everything else in the page alert. No silent failures.

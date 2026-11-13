@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-sans:
+    'Montserrat Variable', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --color-page: #f8f6f2;
   --color-surface: #ffffff;
   --color-line: #e8e0d8;
