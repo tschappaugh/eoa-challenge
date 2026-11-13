@@ -304,3 +304,7 @@ How the work was split:
 
 - [Montserrat](https://github.com/JulietaUla/Montserrat) by Julieta Ulanovsky
   and contributors, SIL Open Font License 1.1, bundled via Fontsource.
+- [Illustration](https://unsplash.com/illustrations/retro-gaming-setup-with-lava-lamps-and-joysticks-tu8UHcHumDA?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText)
+  by [Masantocreative](https://unsplash.com/@masantocreative/illustrations?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText)
+  on [Unsplash](https://unsplash.com/illustrations?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText),
+  used under the Unsplash License.
