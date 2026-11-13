@@ -46,19 +46,20 @@ office library. The full plan and all product decisions are in
 - **Done (design, merged):** Montserrat (self-hosted), new heading and intro
   copy, header with "Code Challenge" on the right, intro image beside the
   text (above it on mobile). CI now runs on every branch push.
-- **Done (final review, branch `fix/final-review`):** full-repo security and
-  best-practices pass (secrets, dependencies, code, Docker, CI); Node 20
-  (EOL) replaced by Node 24; nginx gzip for static files. Recorded in
-  PLAN.md -> "Final review".
-- **In progress (branch `docs/submission`, based on `fix/final-review`):**
-  README, `scripts/generate-key.sh` (writes a new key to `.env` without
-  printing it), PLAN.md write-path correction.
-- **Hold:** the user is reviewing all code before anything else is merged
-  to `main`. Don't merge or push.
-- **Not done:** final transcript export to `ai-logs/transcript.md` (run
-  `scripts/scrub-transcript.sh` on it and search it for the key before
-  committing), illustration license/credit confirmation, final fresh-clone
-  check following only the README.
+- **Done (final review, merged):** full-repo security and best-practices
+  pass (secrets, dependencies, code, Docker, CI); Node 20 (EOL) replaced by
+  Node 24; nginx gzip for static files. Recorded in PLAN.md -> "Final
+  review".
+- **Done (submission, branch `docs/submission`):** README for reviewers,
+  `scripts/generate-key.sh` (writes a new key to `.env` without printing
+  it), checkmark favicon, illustration credit (Unsplash), PLAN.md
+  write-path correction. Quick start verified from a fresh clone of the
+  branch, following only the README. The user reviewed the code before the
+  final merge.
+- **Submission state:** complete. Tests: 86 PHPUnit, 74 Vitest; CI green
+  (five jobs, every push). The AI record is `ai-logs/`: the live session
+  log (complete, written by the hook) and `transcript.md` (the final
+  `/export`, scrubbed with `scripts/scrub-transcript.sh`).
 - Run the backend tests with `--build` so the test image isn't stale.
 
 ## Frontend contract (from hardening)
