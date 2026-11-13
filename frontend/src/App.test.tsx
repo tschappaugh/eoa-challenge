@@ -700,6 +700,26 @@ describe('accessibility', () => {
     expect((await axe(document.body)).violations).toEqual([])
   })
 
+  it('introduces the page with a heading, intro text, and an image', async () => {
+    await renderApp()
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Vote for Your Favorite Game',
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/once per day, you can either suggest a game or vote/i)
+    ).toBeInTheDocument()
+    const image = screen.getByRole('img', {
+      name: 'Retro gaming setup with lava lamps and joysticks',
+    })
+    // Size attributes reserve the space, so the page doesn't jump on load.
+    expect(image).toHaveAttribute('width', '727')
+    expect(image).toHaveAttribute('height', '1000')
+  })
+
   it('exposes landmarks, a skip link, and one h1', async () => {
     await renderApp()
 

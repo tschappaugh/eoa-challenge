@@ -35,15 +35,21 @@ office library. The full plan and all product decisions are in
   into `.env` without printing it and run `docker-compose up -d php`.
 - **Done (hardening, merged):** security review fixes and CI (five green
   jobs: backend, frontend, docker, secret scan, dependency audit).
-- **Done (frontend, branch `feat/frontend`):** React UI for the full feature
-  set (ranked list, add form, vote toggle, creator-only remove with confirm
-  dialog, daily-limit banner with countdown, loading/empty/error states,
-  optimistic updates with rollback). 43 Vitest tests pass; also verified in
-  real Chrome (axe: 0 violations incl. contrast, mobile 390px, keyboard,
-  focus, CSP clean).
+- **Done (frontend, merged):** React UI for the full feature set (ranked
+  list, add form, vote toggle, creator-only remove with confirm dialog,
+  daily-limit banner with countdown, loading/empty/error states, optimistic
+  updates with rollback), two Opus review rounds of fixes, duplicate titles
+  compared with look-alike quotes and dashes folded, and Rank / A-Z sorting
+  (`feat/sort`, merged). Verified in real Chrome (axe: 0 violations incl.
+  contrast, mobile 390px, keyboard, focus, CSP clean).
+- **In progress (design, branch `feat/design`):** Montserrat (self-hosted),
+  new heading and intro copy, header with "Code Challenge" on the right, and
+  an intro image beside the text (above it on mobile). Further design work
+  may follow on this branch. Tests: 74 Vitest.
 - **Not done:** README, final transcript export, fresh-clone verification.
-- **Next:** merge `feat/frontend`, then `docs/submission` (README, a11y pass,
-  scrubbed transcript, fresh-clone `docker-compose up` check).
+- **Next:** finish and merge `feat/design`, then `docs/submission` (README,
+  a11y pass, scrubbed transcript, fresh-clone `docker-compose up` check).
+  Run the backend tests with `--build` so the test image isn't stale.
 
 ## Frontend contract (from hardening)
 
